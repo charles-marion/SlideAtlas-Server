@@ -2,6 +2,7 @@
 .pydevproject
 *.pyc
 .*
+*.~
 docs/build
 docs/docs
 testing/*.png

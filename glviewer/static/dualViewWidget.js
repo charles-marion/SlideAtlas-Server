@@ -3,12 +3,16 @@
 // How the window is deived between viewer1 and viewer1.
 // Default: viewer1 uses all available space.
 var VIEWER1_FRACTION = 1.0;
-
-  
-function InitDualViewWidget() {
+ 
+function InitDualViewWidget(container, imgPath) {
+  if(typeof container == "undefined" && typeof imgPath == "undefined")
+    {
+    container = "body";
+    imgPath = 'webgl-viewer/static';
+    }
   if ( ! MOBILE_DEVICE) {
     // Todo: Make the button become more opaque when pressed.
-    $('<img>').appendTo('body')
+    $('<img>').appendTo(container)
       .css({
         'opacity': '0.4',
         'position': 'absolute',
@@ -18,10 +22,11 @@ function InitDualViewWidget() {
         'right' : '0%',
         'z-index': '1'})
     .attr('id', 'dualWidgetLeft')
-    .attr('src',"webgl-viewer/static/dualArrowLeft2.png")
+    .attr('type','image')
+    .attr('src',imgPath + '/dualArrowLeft2.png')
     .click(function(){ToggleDualView();});
 
-    $('<img>').appendTo('body')
+    $('<img>').appendTo(container)
       .hide()
       .css({
         'opacity': '0.4',
@@ -32,7 +37,8 @@ function InitDualViewWidget() {
         'left' : '50%',
         'z-index': '1'})
     .attr('id', 'dualWidgetRight')
-    .attr('src',"webgl-viewer/static/dualArrowRight2.png")
+    .attr('type','image')
+    .attr('src',imgPath + '/dualArrowRight2.png')
     .click(function(){ToggleDualView();});
     
     VIEWER1.AddGuiElement("#dualWidgetLeft", "Top", 0, "Right", 20);

@@ -477,7 +477,8 @@ NoteIterator.prototype.ToEnd = function() {
 
 // data is the object retrieved from mongo (with string ids)
 // Right now we expect bookmarks, but it will be generalized later.
-function Note () {
+function Note (imgPath) {
+  this.ImgPath = imgPath;
   this.User = GetUser(); // Reset by flask.
   var d = new Date();
   this.Date = d.getTime(); // Also reset later.
@@ -502,11 +503,11 @@ function Note () {
   this.Icon = $('<img>').css({'height': '20px',
                               'width': '20x',
                               'float':'left'})
-                        .attr('src',"webgl-viewer/static/dot.png")
+                        .attr('src',this.ImgPath+"/dot.png")
                         .appendTo(this.Div);
   this.TitleDiv = $('<div>').css({'font-size': '18px',
                                  'margin-left':'20px',
-                                 'color':'#379BFF',})
+                                 'color':'#379BFF'})
                            .text(this.Title)
                            .appendTo(this.Div);
   // The div should attached even if nothing is in it.
@@ -558,17 +559,17 @@ Note.prototype.UpdateChildrenGUI = function() {
   // Clear
   this.ChildrenDiv.empty();
   if (this.Children.length == 0) {
-    this.Icon.attr('src',"webgl-viewer/static/dot.png");
+    this.Icon.attr('src',this.ImgPath+"/dot.png");
     return;
   }
   if (this.ChildrenVisibility == false) {
-    this.Icon.attr('src',"webgl-viewer/static/plus.png")
+    this.Icon.attr('src',this.ImgPath+"/plus.png")
              .click(function() {self.Expand();});
     return;
   }
   
   // Redraw
-  this.Icon.attr('src',"webgl-viewer/static/minus.png")
+  this.Icon.attr('src',this.ImgPath+"/minus.png")
            .click(function() {self.Collapse();});
   for (var i = 0; i < this.Children.length; ++i) {
     this.Children[i].DisplayGUI(this.ChildrenDiv);

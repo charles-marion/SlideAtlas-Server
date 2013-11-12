@@ -111,18 +111,25 @@ function doesBrowserSupportWebGL(canvas) {
 }
 
 
-function initGL() {
-  // Add a new canvas.
-  CANVAS = $('<canvas>').appendTo('body').css({
-      'position': 'absolute',
-      'width': '100%',
-      'height': '100%',
-      'top' : '0px',
-      'left' : '0px',
-      'z-index': '1'
-  }); // class='fillin nodoubleclick'
-  //this.canvas.onselectstart = function() {return false;};
-  //this.canvas.onmousedown = function() {return false;};
+
+function initGL(container) {
+  
+  if(typeof container == "undefined")
+    {
+    CANVAS = $('<canvas>').appendTo('body').css({
+          'position': 'absolute',
+          'width': '100%',
+          'height': '100%',
+          'top' : '0px',
+          'left' : '0px',
+          'z-index': '1'
+      }); 
+    }
+  else
+    {
+    CANVAS = CANVAS = $('<canvas>').appendTo(container);
+    }  
+
   GL = CANVAS[0].getContext("webgl") || CANVAS[0].getContext("experimental-webgl");
   
   // Defined in HTML
@@ -369,20 +376,26 @@ function initView(viewport) {
 //==============================================================================
 // Alternative to webgl, HTML5 2d canvas
 
-
-function initGC() {
+function initGC(container) {
 
   detectMobile();
-
   // Add a new canvas.
-  CANVAS = $('<div>').appendTo('body').css({
-                'position': 'absolute',
-                'width': '100%',
-                'height': '100%',
-                'top' : '0px',
-                'left' : '0px',
-                'z-index': '1'
-            });
+  if(typeof container == "undefined")
+    {
+    CANVAS = $('<div>').appendTo("body").css({
+              'position': 'absolute',
+              'width': '100%',
+              'height': '100%',
+              'top' : '0px',
+              'left' : '0px',
+              'z-index': '1'
+          });
+     
+    }
+  else
+    {
+    CANVAS = $(container);
+    }    
 }
 
 

@@ -10,9 +10,12 @@ function Cache(dbId, imageId, numLevels, bounds) {
   }
   
   var sourceStr = "/tile?img="+imageId+"&db="+dbId+"&name=";
-
+  
   this.ImageId = imageId;
   this.DatabaseId = dbId;
+  
+  // See http://wiki.osgeo.org/wiki/Tile_Map_Service_Specification
+  this.UseTMS = false;
 
   // For debugging
   //this.PendingTiles = [];
@@ -35,6 +38,7 @@ Cache.prototype.destructor=function()
 {
 }
 
+
 Cache.prototype.GetLeafSpacing = function() {
   return this.RootSpacing[0] / (1 << (this.NumberOfLevels-1));
 }
@@ -42,6 +46,12 @@ Cache.prototype.GetLeafSpacing = function() {
 Cache.prototype.GetBounds = function() {
   return this.Bounds;
 }
+
+Cache.prototype.EnableTMSMode = function(value)
+{
+  this.UseTMS = value;
+}
+
 
 // This method converts a point in image coordinates to a point in world coordinates.
 Cache.prototype.ImageToWorld = function(imagePt) {
@@ -66,11 +76,10 @@ Cache.prototype.WorldToImage = function(worldPt) {
   return [worldPt[0]-this.Origin[0], worldPt[1]-this.Origin[1]];
 }
 
-
-
-
-
-
+Cache.prototype.SetSource = function(url)
+{
+  this.Source = url;
+}
 
 Cache.prototype.GetSource=function()
 {
@@ -309,7 +318,9 @@ Cache.prototype.GetTile = function(slice, level, id) {
   if (this.RootTiles[slice] == null) {
     var tile;
     //var name = slice + "/t";
-    var name = "t";
+    var name;
+    if(this.UseTMS) name = "0_0_0";
+    else name = "t";
     tile = new Tile(0,0,slice, 0, name, this);
     this.RootTiles[slice] = tile;
   }
@@ -334,6 +345,8 @@ Cache.prototype.RecursiveGetTile = function(node, deltaDepth, x, y, z) {
     if (childIdx == 1) {childName += "s";} 
     if (childIdx == 2) {childName += "q";} 
     if (childIdx == 3) {childName += "r";} 
+    
+    if(this.UseTMS) childName = (node.Level+1)+"_"+x+"_"+y;
     child = new Tile(x>>deltaDepth, y>>deltaDepth, z,
                      (node.Level + 1),
                      childName, this);

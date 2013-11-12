@@ -237,7 +237,7 @@ function SaveAnnotations() {
     success: function(data,status){
        //alert(data + "\nStatus: " + status);
        },
-    error: function() { alert( "AJAX error(): stack-save" ); },
+    error: function() { alert( "AJAX - error()" ); },
     });
 }
 
@@ -417,7 +417,7 @@ function SaveView() {
     success: function(data,status){
        //alert(data + "\nStatus: " + status);
        },
-    error: function() { alert( "AJAX - error(): save-view" ); },
+    error: function() { alert( "AJAX - error(): save View" ); },
     }});
 }
 

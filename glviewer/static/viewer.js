@@ -22,6 +22,9 @@ function Viewer (viewport, cache) {
   // What to do for mouse move or mouse up.
   this.InteractionState = INTERACTION_NONE;
   
+  // Reverse mouse wheel zooming
+  this.ReverseMouseWheel = false;
+  
   this.AnimateLast;
   this.AnimateDuration = 0.0;
   this.TranslateTarget = [0.0,0.0];
@@ -350,6 +353,9 @@ Viewer.prototype.AnimateTranslate = function(dx, dy) {
 }
 
 Viewer.prototype.AnimateRoll = function(dRoll) {
+  if(this.MainView.Camera.Roll > 2*Math.PI) this.MainView.Camera.Roll = this.MainView.Camera.Roll - 2*Math.PI;
+  if(this.MainView.Camera.Roll < -2*Math.PI) this.MainView.Camera.Roll = this.MainView.Camera.Roll + 2*Math.PI;
+    
   dRoll *= Math.PI / 180.0;
   this.RollTarget = this.MainView.Camera.Roll + dRoll;
  
@@ -1031,13 +1037,12 @@ Viewer.prototype.HandleMouseWheel = function(event) {
     //this.ActiveWidget.HandleMouseDown(event);
     return;
   }
-  // Compute traslate target to keep position in the same place.
-  this.TranslateTarget[0] = this.MainView.Camera.FocalPoint[0];
-  this.TranslateTarget[1] = this.MainView.Camera.FocalPoint[1];
-  this.RollTarget = this.MainView.Camera.Roll;
 
   // we want to acumilate the target, but not the duration.
-  var tmp = event.SystemEvent.wheelDelta;
+  var wheelDelta = event.SystemEvent.wheelDelta;
+  if(this.ReverseMouseWheel) wheelDelta = -wheelDelta;
+  
+  var tmp = wheelDelta;
   while (tmp > 0) {
     this.ZoomTarget *= 1.1;
     tmp -= 120;
@@ -1046,6 +1051,25 @@ Viewer.prototype.HandleMouseWheel = function(event) {
     this.ZoomTarget /= 1.1;
     tmp += 120;
   }
+  
+  var mWorld = this.ConvertPointViewerToWorld(event.MouseX, event.MouseY);
+  var newFocal = [];
+  var deltaX = 0;
+  var deltaY = 0;
+  
+  // Zoom in where the is
+  if(wheelDelta < 0)
+    {
+    deltaX = (this.MainView.Camera.FocalPoint[0] - mWorld[0])/3;
+    deltaY = (this.MainView.Camera.FocalPoint[1] - mWorld[1])/3;
+    }
+  newFocal[0] = this.MainView.Camera.FocalPoint[0] - deltaX;
+  newFocal[1] = this.MainView.Camera.FocalPoint[1] - deltaY;
+
+  // Compute traslate target to keep position in the same place.
+  this.TranslateTarget[0] = newFocal[0];
+  this.TranslateTarget[1] = newFocal[1];
+  this.RollTarget = this.MainView.Camera.Roll;
 
   // Artificial limit (fixme).
   if (this.ZoomTarget < 0.9 / (1 << 5)) {

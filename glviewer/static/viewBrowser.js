@@ -123,6 +123,19 @@ function ViewBrowserImageCallback(obj) {
         });
 }
 
+/**
+ * Load an image.
+ * @param viewer. Main viewer object
+ * @param viewData. Options
+ * @param url Query url
+ */
+function LoadImage(viewer, viewData, url) {
+  ACTIVE_VIEWER = viewer;
+  ViewBrowserLoadImage(viewData);
+  ACTIVE_VIEWER.GetCache().SetSource(url);
+  if(viewData['use_tms']) ACTIVE_VIEWER.GetCache().EnableTMSMode(true);
+}
+
 function ViewBrowserLoadImage(viewData) {
   // If we want to take origin and spacing into account, then we need to change tile geometry computation.
   var bds = [0, viewData.dimensions[0], 0, viewData.dimensions[1]];

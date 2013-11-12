@@ -11,14 +11,24 @@
 // - eliminate polyLine verticies when they are dragged ontop of another vert.
 //   or maybe the delete key.
 
-function AnnotationWidget (viewer) {
+function AnnotationWidget (viewer, container, imgPath) {
+  if(typeof container == "undefined")
+    {
+    container = "body";
+    }
+  if(typeof imgPath == "undefined")
+    {
+    imgPath = "webgl-viewer/static";
+    }
+    
   var self = this; // trick to set methods in callbacks. 
+  this.ImgPath = imgPath;
   this.Viewer = viewer;
   viewer.AnnotationWidget = this;
 
   if ( ! MOBILE_DEVICE) {
     // We need unique names for the HTML elements.
-    this.Widget = $('<table>').appendTo('body')
+    this.Widget = $('<table>').appendTo(container)
       .css({
         'opacity': '0.6',
         'position': 'absolute',
@@ -36,7 +46,7 @@ function AnnotationWidget (viewer) {
         'opacity': '0.6',
         'border-radius': '5px'})
       .attr('type','image')
-      .attr('src',"webgl-viewer/static/pencil3.png")
+      .attr('src',imgPath+"/pencil3.png")
       .click(function(){self.ToggleVisibility();});
     
     this.ToolsTable = $('<td>').appendTo(row)
@@ -49,22 +59,22 @@ function AnnotationWidget (viewer) {
     $('<img>').appendTo(this.ToolsTable)
       .css({'height': '28px'})
       .attr('type','image')
-      .attr('src',"webgl-viewer/static/Text.gif")
+      .attr('src',imgPath+"/Text.gif")
       .click(function(){self.NewText();});
     $('<img>').appendTo(this.ToolsTable)
       .css({'height': '28px'})
       .attr('type','image')
-      .attr('src',"webgl-viewer/static/Circle.gif")
+      .attr('src',imgPath+"/Circle.gif")
       .click(function(){self.NewCircle();});
     $('<img>').appendTo(this.ToolsTable)
       .css({'height': '28px'})
       .attr('type','image')
-      .attr('src',"webgl-viewer/static/FreeForm.gif")
+      .attr('src',imgPath+"/FreeForm.gif")
       .click(function(){self.NewPolyline();});
     $('<img>').appendTo(this.ToolsTable)
       .css({'height': '28px'})
       .attr('type','image')
-      .attr('src',"webgl-viewer/static/Pencil-icon.jpg")
+      .attr('src',imgPath+"/Pencil-icon.jpg")
       .click(function(){self.NewPencil();});
   }
 }
@@ -75,13 +85,13 @@ AnnotationWidget.prototype.SetVisibility = function(visibility) {
   }
   if (this.VisibilityButton) {
     if (visibility == ANNOTATION_OFF) {
-      this.VisibilityButton.attr('src',"webgl-viewer/static/pencil3.png")    
+      this.VisibilityButton.attr('src',this.ImgPath+"/pencil3.png")    
       this.ToolsTable.fadeOut();
     } else if (visibility == ANNOTATION_NO_TEXT) {
-      this.VisibilityButton.attr('src',"webgl-viewer/static/pencil3Flip.png")
+      this.VisibilityButton.attr('src',this.ImgPath+"/pencil3Flip.png")
       this.ToolsTable.fadeIn();  
     } else {
-      this.VisibilityButton.attr('src',"webgl-viewer/static/pencil3Up.png")
+      this.VisibilityButton.attr('src',this.ImgPath+"/pencil3Up.png")
     }
   }
   

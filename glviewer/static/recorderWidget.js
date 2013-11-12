@@ -136,7 +136,7 @@ ViewerRecord.prototype.Apply = function (viewer) {
   if ( ! this.Bounds && this.Dimensions) {
     this.Bounds = [0, this.Dimensions[0], 0, this.Dimensions[1]];    
   }
-  
+
   var cache = viewer.GetCache();
   if ( ! cache || this.Image != cache.ImageId) {
     var newCache = new Cache(this.Database, 
@@ -182,11 +182,16 @@ var RECORDING_BUTTON;
 var UNDO_BUTTON;
 var REDO_BUTTON;
 
-function InitRecorderWidget() {
+function InitRecorderWidget(container, imgPath) {
 
+  if(typeof container == "undefined" && typeof imgPath == "undefined")
+    {
+    container = "body";
+    imgPath = 'webgl-viewer/static';
+    }
   // The recording button indicates that recording is in 
   // progress and also acts to stop recording.
-  RECORD_BUTTON = $('<img>').appendTo('body')
+  RECORD_BUTTON = $('<img>').appendTo(container)
     .css({
       'opacity': '0.5',
       'position': 'absolute',
@@ -194,14 +199,14 @@ function InitRecorderWidget() {
       'bottom' : '120px',
       'right' : '20px',
       'z-index': '1'})
-    .attr('src','webgl-viewer/static/stopRecording2.png')
+    .attr('src',imgPath + '/stopRecording2.png')
     .hide()
     .click(RecordingStop);
 
 
   // Optional buttons.  Exposed for testing.
   // Undo (control z) and redo (control y) keys work,
-  UNDO_BUTTON = $('<img>').appendTo('body')
+  UNDO_BUTTON = $('<img>').appendTo(container)
     .css({
       'opacity': '0.5',
       'position': 'absolute',
@@ -209,17 +214,17 @@ function InitRecorderWidget() {
       'bottom' : '5px',
       'right' : '100px',
       'z-index': '1'})
-    .attr('src','webgl-viewer/static/undo.png')
+    .attr('src',imgPath + '/undo.png')
     .hide()
     .click(function(){alert("undo");});
-  REDO_BUTTON = $('<img>').appendTo('body').css({
+  REDO_BUTTON = $('<img>').appendTo(container).css({
       'opacity': '0.5',
       'position': 'absolute',
       'height': '30px',
       'bottom' : '5px',
       'right' : '70px',
       'z-index': '1'})
-    .attr('src','webgl-viewer/static/redo.png')
+    .attr('src',imgPath + '/redo.png')
     .hide()
     .click(function(){alert("REDO");});
 
