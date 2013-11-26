@@ -110,8 +110,13 @@ def sessions():
           if "Type" in viewobj:
             # my new notes make it difficult to get the image.
             if viewobj["Type"] == "Note" :
-              imgid = viewobj["ViewerRecords"][0]["Image"]
-              imgdb = viewobj["ViewerRecords"][0]["Database"]
+              if viewobj["ViewerRecords"][0].has_key("Database") :
+                imgid = viewobj["ViewerRecords"][0]["Image"]
+                imgdb = viewobj["ViewerRecords"][0]["Database"]
+              else :
+                imgid = viewobj["ViewerRecords"][0]["Image"]["_id"]
+                imgdb = viewobj["ViewerRecords"][0]["Image"]["database"]
+
           if imgid == 0 :
             imgdb = sessdb
             imgid = str(viewobj["img"])
@@ -192,6 +197,8 @@ def sessions():
       for arule in userobj["rules"]:
         rule = {}
         ruleobj = admindb["rules"].Rule.find_one({"_id" : arule})
+        if ruleobj == None:
+            continue
         #flash(str(ruleobj), 'success')
         rule["rule"] = ruleobj["label"]
 
@@ -247,8 +254,6 @@ def sessions():
 
 
 
-
-
 # change the order of views in the
 @mod.route('/sessionedit')
 def sessionedit():
@@ -291,9 +296,14 @@ def sessionedit():
             imgid = view["img"]
           else :
             # an assumption that view is of type note.
-            imgid = view["ViewerRecords"][0]["Image"]
-            imgdb = view["ViewerRecords"][0]["Database"]
-
+            viewerRecord = view["ViewerRecords"][0]
+            if viewerRecord.has_key("Database") :
+              imgid = viewerRecord["Image"]
+              imgdb = viewerRecord["Database"]
+            else :
+              imgid = viewerRecord["Image"]["_id"]
+              imgdb = viewerRecord["Image"]["database"]
+              
           # support for images from different database than the session.
           if imgdb == sessdb :
             image = db["images"].find_one({'_id' : ObjectId(imgid)})
@@ -463,12 +473,12 @@ def sessionsave():
     if newFlag :
       del sessObj["_id"]
       sessObj["user"] = email;
-      sessid = db["sessions"].save(sessObj);    
+      sessObj["_id"] = db["sessions"].save(sessObj);    
     elif len(newViews) == 0 :
       db["sessions"].remove({"_id":sessObj["_id"]});
-      sessid = "";
+      sessObj = {};
     else :
-      sessid = db["sessions"].save(sessObj);
+      db["sessions"].save(sessObj);
 
-    return str(sessid);
+    return jsonify(sessObj)
 

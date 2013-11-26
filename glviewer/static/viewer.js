@@ -57,11 +57,6 @@ function Viewer (viewport, cache) {
   this.GuiElements = [];
 }
 
-// TODO: LEGACY REMOVE
-Viewer.prototype.SetDimensions = function(dims) {
-  this.MainView.Section.Bounds = [0,dims[0], 0,dims[1]];
-}
-
 Viewer.prototype.GetAnnotationVisibility = function() {
   return this.AnnotationVisibility;
 }
@@ -112,9 +107,10 @@ Viewer.prototype.SetSection = function(section) {
   if (this.OverView) {
     this.OverView.Section = section;
     //this.ShapeList = section.Markers;
-    this.OverView.Camera.Height = section.Bounds[3]-section.Bounds[2];
-    this.OverView.Camera.FocalPoint[0] = 0.5*(section.Bounds[0]+section.Bounds[1]);
-    this.OverView.Camera.FocalPoint[1] = 0.5*(section.Bounds[2]+section.Bounds[3]);
+    var bounds = section.GetBounds();
+    this.OverView.Camera.Height = bounds[3]-bounds[2];
+    this.OverView.Camera.FocalPoint[0] = 0.5*(bounds[0]+bounds[1]);
+    this.OverView.Camera.FocalPoint[1] = 0.5*(bounds[2]+bounds[3]);
     this.OverView.Camera.ComputeMatrix();
   }
   eventuallyRender();
@@ -127,7 +123,7 @@ Viewer.prototype.SetCache = function(cache) {
   if (this.OverView) {
     this.OverView.SetCache(cache);
     if (cache) {
-      var bds = cache.Bounds;
+      var bds = cache.GetBounds();
       if (bds) {
         this.OverView.Camera.FocalPoint[0] = (bds[0] + bds[1]) / 2;
         this.OverView.Camera.FocalPoint[1] = (bds[2] + bds[3]) / 2;
@@ -852,8 +848,8 @@ Viewer.prototype.ConstrainCamera = function () {
     cam.Height = 2*(bounds[3]-bounds[2]);
     modified = true;
   }  
-  if (cam.Height < viewport[3] * spacing) {
-    cam.Height = viewport[3] * spacing;
+  if (cam.Height < viewport[3] * spacing * 0.5) {
+    cam.Height = viewport[3] * spacing * 0.5;
     modified = true;
   }
   if (modified) {
@@ -1082,6 +1078,22 @@ Viewer.prototype.HandleMouseWheel = function(event) {
 }
 
 Viewer.prototype.HandleKeyPress = function(keyCode, shift) {
+  // Handle stack (page up  / down)
+  var cache = this.GetCache();
+  if (cache && cache.Image.type && cache.Image.type == "stack") {
+    if (keyCode == 33) {
+      SLICE = SLICE - 1;
+      if (SLICE < 1) { SLICE = 1;}
+      eventuallyRender();
+    } else if (keyCode == 34) {
+      SLICE = SLICE + 1;
+      if (SLICE > cache.Image.dimensions[2]) { 
+        SLICE = cache.Image.dimensions[2];
+      }
+      eventuallyRender();
+    }    
+  }
+  
   // Handle connectome volume stuff.
   // TODO: integrate this with the 3d renal stack stuff.
   // connectome

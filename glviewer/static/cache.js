@@ -1,18 +1,17 @@
 
 
 // Source is the directory that contains the tile files.
-function Cache(dbId, imageId, numLevels, bounds) {
+function Cache(image) {
   // Look through existing caches and reuse one if possible
   for (var i = 0; i < CACHES.length; ++i) {
-    if (CACHES[i].ImageId == imageId) {
+    if (CACHES[i].Image._id == image._id) {
       return CACHES[i];
     }
   }
   
-  var sourceStr = "/tile?img="+imageId+"&db="+dbId+"&name=";
+  var sourceStr = "/tile?img="+image._id+"&db="+image.database+"&name=";
   
-  this.ImageId = imageId;
-  this.DatabaseId = dbId;
+  this.Image = image;
   
   // See http://wiki.osgeo.org/wiki/Tile_Map_Service_Specification
   this.UseTMS = false;
@@ -22,16 +21,22 @@ function Cache(dbId, imageId, numLevels, bounds) {
   this.Source = sourceStr;
 
   this.Warp = null;
-  this.Bounds = bounds;
-  this.TileDimensions = [256, 256];
-  this.RootSpacing = [1<<(numLevels-1), 1<<(numLevels-1), 10.0];
-  this.NumberOfSections = 1;
-  this.NumberOfLevels = numLevels;
-  
+  this.RootSpacing = [1<<(image.levels-1), 1<<(image.levels-1), 10.0];
   this.RootTiles = [];
-
   // Keep a global list for pruning tiles.
   CACHES.push(this);
+  if (image.type && image.type == "stack") {
+    this.NumberOfSections = image.dimensions[2];
+    this.TileDimensions = [image.dimensions[0], image.dimensions[1]];
+    var qTile;
+    for (var slice = 1; slice <= this.NumberOfSections; ++slice) {
+      qTile = this.GetTile(slice, 0, 0);
+      LoadQueueAdd(qTile);
+    }
+  } else {
+    this.TileDimensions = [256, 256];
+    this.NumberOfSections = 1;
+  }
 }
 
 Cache.prototype.destructor=function()
@@ -40,11 +45,14 @@ Cache.prototype.destructor=function()
 
 
 Cache.prototype.GetLeafSpacing = function() {
-  return this.RootSpacing[0] / (1 << (this.NumberOfLevels-1));
+  return this.RootSpacing[0] / (1 << (this.Image.levels-1));
 }
 
 Cache.prototype.GetBounds = function() {
-  return this.Bounds;
+  if (this.Image && this.Image.bounds) {
+    return this.Image.bounds;
+  }
+  return [0,10000,0,10000]
 }
 
 Cache.prototype.EnableTMSMode = function(value)
@@ -88,11 +96,12 @@ Cache.prototype.GetSource=function()
 
 Cache.prototype.LoadRoots = function () {
     var qTile;
-    for (var slice = 1; slice < 2; ++slice) {
+    for (var slice = 1; slice <= this.Image.dimensions[2]; ++slice) {
         qTile = this.GetTile(slice, 0, 0);
         LoadQueueAdd(qTile);
     }
     return;
+    
     // Theses were for a demo (preload).
     for (var slice = 201; slice < 251; ++slice) {
         for (var j = 0; j < 4; ++j) {
@@ -317,10 +326,16 @@ Cache.prototype.GetTile = function(slice, level, id) {
   var y = id >> level;
   if (this.RootTiles[slice] == null) {
     var tile;
-    //var name = slice + "/t";
+    
     var name;
     if(this.UseTMS) name = "0_0_0";
-    else name = "t";
+    else if (this.Image.type && this.Image.type == "stack") {
+      // name = slice + "/t";
+      name = slice.toString();
+    } else {
+      name = "t";
+    }
+    
     tile = new Tile(0,0,slice, 0, name, this);
     this.RootTiles[slice] = tile;
   }
