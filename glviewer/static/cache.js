@@ -19,7 +19,14 @@ function Cache(image) {
   // For debugging
   //this.PendingTiles = [];
   this.Source = sourceStr;
+  
+  this.SourceIndex = 0;
 
+  this.DebugMode = false;
+  if(typeof image.debug != "undefined")
+    {
+    this.DebugMode = image.debug;
+    }
   this.Warp = null;
   this.RootSpacing = [1<<(image.levels-1), 1<<(image.levels-1), 10.0];
   this.RootTiles = [];
@@ -91,8 +98,26 @@ Cache.prototype.SetSource = function(url)
 
 Cache.prototype.GetSource=function()
 {
-    return this.Source;
+  if(this.Source instanceof Array) 
+    {
+    var index = this.SourceIndex;
+    var maxIndex = this.Source.length;
+    if(index == maxIndex-1)
+      {
+      this.SourceIndex = 0;
+      }
+    else
+      {
+      this.SourceIndex++;
+      }
+    return this.Source[index];
+    } 
+  else 
+    {
+    return this.Source
+    }
 }
+  
 
 Cache.prototype.LoadRoots = function () {
     var qTile;
@@ -219,7 +244,6 @@ Cache.prototype.ChooseTiles = function(view, slice, tiles) {
   
   // Logic for progressive rendering is in the loader:
   // Do not load a tile if its parent is not loaded.
-    
   var tiles = [];
   var tileIds = this.GetVisibleTileIds(level, bounds);
   var tile;
@@ -361,7 +385,7 @@ Cache.prototype.RecursiveGetTile = function(node, deltaDepth, x, y, z) {
     if (childIdx == 2) {childName += "q";} 
     if (childIdx == 3) {childName += "r";} 
     
-    if(this.UseTMS) childName = (node.Level+1)+"_"+x+"_"+y;
+    if(this.UseTMS) childName = (node.Level+1)+"_"+(x>>deltaDepth)+"_"+(y>>deltaDepth);
     child = new Tile(x>>deltaDepth, y>>deltaDepth, z,
                      (node.Level + 1),
                      childName, this);

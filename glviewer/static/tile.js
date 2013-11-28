@@ -27,13 +27,6 @@ function GetErrorImageFunction (callback) {
 }
 
 
-
-
-
-
-
-
-
 // Three stages to loading a tile: (texture map is created when the tile is rendered.
 // 1: Create a tile object.
 // 2: Initialize the texture.
@@ -214,7 +207,7 @@ Tile.prototype.Draw = function (program, context) {
     // Matrix is world to 0-1.
     context.transform(this.Matrix[0], this.Matrix[1],
                       this.Matrix[4], this.Matrix[5],
-                      this.Matrix[12], this.Matrix[13]);
+                      this.Matrix[12], this.Matrix[13]);         
 
 
     // Flip the tile upside down, but leave it in the same place
@@ -228,10 +221,20 @@ Tile.prototype.Draw = function (program, context) {
     } else {
       context.transform(1.0/255.5, 0.0, 0.0, 1.0/255.5, -0.25/255.0, -0.25/255.0);  
     }
+
     context.drawImage(this.Image,0,0);
     //context.strokeStyle="green"; // I need to find the method that converts RBG array to hex color
     //context.rect(0,0,256, 256); 
     //context.stroke();    
+    
+    if(this.Cache.DebugMode)
+      {
+      context.lineWidth=1;
+      context.fillStyle="#000000";
+      context.lineStyle="#000000";
+      context.font="12px sans-serif";
+      context.fillText(this.Name, this.Cache.TileDimensions[0]/2, this.Cache.TileDimensions[1]/2);
+      }
 
     //  Transform to map (0->1, 0->1)
     context.restore();

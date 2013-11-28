@@ -38,10 +38,11 @@ function StartVisualizationSession(container, userOptions) {
     "viewHeight" : 22000,
     "imgPath" : "static/",
     "dimensions" : [0,0,0],
-    "collection" : "-1",
+    "_id" : "-1",
     "url" : "-1",
     "use_tms" : false,
     "levels" : "10",
+    "debug" : false,
     "use_dual" : false,
     "use_recorder" : false,
     "use_notes" : false,
@@ -118,8 +119,8 @@ function StartVisualizationSession(container, userOptions) {
     'position': 'static'
   });    
   VIEWER1.OverView.Canvas.appendTo(divWrapper);
-  VIEWER1.OverView.Camera.FocalPoint = [options.center[0], options.center[1], 10.0];
-  VIEWER1.OverView.Camera.Height = options.viewHeight;
+  VIEWER1.MainView.Camera.FocalPoint = [options.center[0], options.center[1], 10.0];
+  VIEWER1.MainView.Camera.Height = options.viewHeight;
   
   if(options.use_edit)InitViewEditMenus();
   if(options.use_browser)InitViewBrowser();
@@ -152,6 +153,12 @@ function StartVisualizationSession(container, userOptions) {
     VIEWER1.ReverseMouseWheel = options.reverse_mouse_wheel;
     EVENT_MANAGER.HandleMouseWheel(e);
   }, false);
+  can.addEventListener("DOMMouseScroll", function(e){
+    VIEWER1.ReverseMouseWheel = options.reverse_mouse_wheel;
+    e.wheelDelta = -e.detail*40;
+    EVENT_MANAGER.HandleMouseWheel(e);
+  }, false);
+
 
   document.body.addEventListener("mouseup", function(e){
     EVENT_MANAGER.HandleMouseUp(e);
@@ -165,7 +172,9 @@ function StartVisualizationSession(container, userOptions) {
   handleResize();
   if(options.use_dual) DualViewUpdateGui();
   
-  LoadImage(VIEWER1, options, options['url']);
+  if(typeof options.bounds == "undefined") options.bounds = [0, options.dimensions[0], 0, options.dimensions[1]];
+ 
+  LoadImage(VIEWER1, options);
   eventuallyRender();
 }
 

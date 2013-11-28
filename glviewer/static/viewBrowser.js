@@ -134,10 +134,17 @@ function ViewBrowserImageCallback(obj) {
  * @param viewData. Options
  * @param url Query url
  */
-function LoadImage(viewer, viewData, url) {
+function LoadImage(viewer, viewData) {
   ACTIVE_VIEWER = viewer;
-  ViewBrowserLoadImage(viewData);
-  ACTIVE_VIEWER.GetCache().SetSource(url);
+  var source = new Cache(viewData);
+  ACTIVE_VIEWER.SetCache(source);     
+  RecordState();
+  eventuallyRender();  
+  source.SetSource(viewData['url']);
+  if(viewData['url'] instanceof Array) 
+    {
+    LOADING_MAXIMUM = viewData['url'].length * 4;
+    }
   if(viewData['use_tms']) ACTIVE_VIEWER.GetCache().EnableTMSMode(true);
 }
 
@@ -152,10 +159,3 @@ function ViewBrowserLoadImage(viewData) {
 
   eventuallyRender();
 }
-
-
-
-
-
-
-
