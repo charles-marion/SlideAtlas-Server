@@ -34,6 +34,8 @@ function StartVisualizationSession(container, userOptions) {
   
   var options = {
     "center" : [0,0,0],
+    "overview_cursor" : 'default',
+    "overview_color" : "#4011E5",
     "rotation" : 0,
     "viewHeight" : 22000,
     "imgPath" : "static/",
@@ -63,14 +65,11 @@ function StartVisualizationSession(container, userOptions) {
   EVENT_MANAGER = new EventManager(CANVAS);
 
   $(container).css('position', 'relative');
-  var width = CANVAS.innerWidth();
-  var height = CANVAS.innerHeight();
+  var width = $(container).width();
+  var height = $(container).height();
   var halfWidth = width/2;
   VIEWER1 = new Viewer([0,0, halfWidth,height], null);
   EVENT_MANAGER.AddViewer(VIEWER1);
-
-  VIEWER2 = new Viewer([halfWidth,0, halfWidth,height], null);
-  EVENT_MANAGER.AddViewer(VIEWER2);
   
   // Might consider interactive resize feature too.
   var handleResize = function () {
@@ -116,8 +115,12 @@ function StartVisualizationSession(container, userOptions) {
     'top': "5px"
   });
   VIEWER1.OverView.Canvas.css({
-    'position': 'static'
+    'position': 'static',
+    'cursor': options.overview_cursor
   });    
+  
+  VIEWER1.OverView.Color = options.overview_color
+  
   VIEWER1.OverView.Canvas.appendTo(divWrapper);
   VIEWER1.MainView.Camera.FocalPoint = [options.center[0], options.center[1], 10.0];
   VIEWER1.MainView.Camera.Height = options.viewHeight;

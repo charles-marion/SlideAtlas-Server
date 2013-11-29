@@ -9,9 +9,7 @@ function View (viewport, layer) { // connectome: remove cache arg to constructor
   for (var i = 0; i < 4; ++i) {
     viewport[i] = Math.round(viewport[i]);
   }
-  // Allow for border.
-  viewport[2] -=2;  
-  viewport[3] -=2;  
+
 
   // connectome : default section so we cen set cache.
   this.Section = new Section;
@@ -81,9 +79,6 @@ View.prototype.SetViewport = function(viewport) {
   for (var i = 0; i < 4; ++i) {
     viewport[i] = Math.round(viewport[i]);
   }
-  // Allow for border.
-  viewport[2] -=2;  
-  viewport[3] -=2;
   if (this.Canvas) {
     if (viewport[2] < 3 || viewport[3] < 1) {
       this.Canvas.hide();

@@ -270,10 +270,15 @@ Camera.prototype.Draw = function (overview) {
     */
     ctx.save();
     ctx.setTransform(1,0,0,1,0,0);
-    ctx.strokeStyle="#4011E5";
-    ctx.beginPath();
-    ctx.rect(newCx-rx,newCy-ry,2*rx,2*ry); 
-    ctx.stroke();
+    if(typeof overview.Color != undefined)
+      {
+      ctx.strokeStyle=overview.Color;
+      }
+    else
+      {
+      ctx.strokeStyle="#4011E5";
+      }
+    ctx.strokeRect(newCx-rx,newCy-ry,2*rx,2*ry);
     ctx.restore();
   }
   
