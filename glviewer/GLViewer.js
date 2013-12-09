@@ -2191,14 +2191,6 @@ Camera.prototype.Draw = function (overview) {
 
     // The 2d canvas was left in world coordinates.
     var ctx = overview.Context2d;
-    /*
-    ctx.beginPath();
-    //ctx.strokeStyle="#E500E5";
-    ctx.rect(this.FocalPoint[0]-(0.5*width),this.FocalPoint[1]-(0.5*height),width,height); 
-    //ctx.fillStyle="#E500E5";
-    //ctx.fillRect(this.FocalPoint[0]-(0.5*width),this.FocalPoint[1]-(0.5*height),width,height); 
-    ctx.stroke();
-    */
     ctx.save();
     ctx.setTransform(1,0,0,1,0,0);
     if(typeof overview.Color != undefined)
@@ -2210,7 +2202,6 @@ Camera.prototype.Draw = function (overview) {
       ctx.strokeStyle="#4011E5";
       }
     ctx.strokeRect(newCx-rx,newCy-ry,2*rx,2*ry);
-
     ctx.restore();
   }
   
@@ -3152,7 +3143,8 @@ function View (viewport, layer) { // connectome: remove cache arg to constructor
   this.OutlineCamMatrix = mat4.create();
   
   // 2d canvas
-  if ( ! GL) {
+  if ( !GL) {
+    
     // Add a new canvas.
     this.Canvas = $('<canvas>').appendTo(CANVAS).css({
         'position': 'absolute',
@@ -3351,6 +3343,7 @@ function Viewer (viewport, cache) {
     var overViewport = [viewport[0] + viewport[2]*0.8, 
                         viewport[1] + viewport[3]*0.8,
                         viewport[2]*0.18, viewport[3]*0.18];
+       
     this.OverView = new View(overViewport, 2);
     this.OverView.Camera.ZRange = [-1,0];
     this.OverView.Camera.FocalPoint = [13000.0, 11000.0, 10.0];
@@ -4161,10 +4154,12 @@ Viewer.prototype.ConstrainCamera = function () {
   if (cam.Height > 2*(bounds[3]-bounds[2])) {
     cam.Height = 2*(bounds[3]-bounds[2]);
     modified = true;
+    this.ZoomTarget = cam.Height;
   }  
   if (cam.Height < viewport[3] * spacing * 0.5) {
     cam.Height = viewport[3] * spacing * 0.5;
     modified = true;
+    this.ZoomTarget = cam.Height;
   }
   if (modified) {
     cam.ComputeMatrix();
@@ -4192,10 +4187,9 @@ Viewer.prototype.HandleMouseDown = function(event) {
         x < this.OverView.Viewport[0]+this.OverView.Viewport[2] &&
         y < this.OverView.Viewport[1]+this.OverView.Viewport[3]) {
       this.OverViewEventFlag = true;
-      // Transform to view's coordinate system.
       x = x - this.OverView.Viewport[0];
       y = y - this.OverView.Viewport[1];
-      this.OverViewPlaceCamera(x, y);
+      this.OverViewPlaceCamera(x-2, y);
       return;
     }
   }
@@ -4305,7 +4299,7 @@ Viewer.prototype.HandleMouseMove = function(event) {
   if (this.OverViewEventFlag) {
     x = x - this.OverView.Viewport[0];
     y = y - this.OverView.Viewport[1];
-    this.OverViewPlaceCamera(x, y);
+    this.OverViewPlaceCamera(x-2, y);
     // Animation handles the render.
     return;
   }
@@ -4351,6 +4345,11 @@ Viewer.prototype.HandleMouseWheel = function(event) {
   // we want to acumilate the target, but not the duration.
   var wheelDelta = event.SystemEvent.wheelDelta;
   if(this.ReverseMouseWheel) wheelDelta = -wheelDelta;
+  
+  var spacing = this.MainView.GetLeafSpacing();
+  var viewport = this.MainView.GetViewport();
+  var cam = this.MainView.Camera;
+  var bounds = this.MainView.GetBounds();
   
   var tmp = wheelDelta;
   while (tmp > 0) {
@@ -9154,6 +9153,9 @@ function StartVisualizationSession(container, userOptions) {
     "center" : [0,0,0],
     "overview_cursor" : 'default',
     "overview_color" : "#4011E5",
+    "overview_padding": 12,
+    "overview_width_percentage": 15, 
+    "overview_height_percentage": 30, 
     "rotation" : 0,
     "viewHeight" : 22000,
     "imgPath" : "static/",
@@ -9206,40 +9208,37 @@ function StartVisualizationSession(container, userOptions) {
     }
     // The remaining width is split between the two viewers.
     var width1 = (width-left) * VIEWER1_FRACTION;
-    var width2 = (width-left) - width1;
     if (VIEWER1) {
+
+       var overViewWidth = width1 * options.overview_width_percentage/100;
+       var overViewHeight = height * options.overview_height_percentage/100;
+       var overViewport = [left + width1 - overViewWidth - options.overview_padding, 
+                        height - overViewHeight - options.overview_padding,
+                        overViewWidth,
+                        overViewHeight];
+        
       VIEWER1.SetViewport([left, 0, width1, height]);
+      VIEWER1.OverView.SetViewport(overViewport);
+      VIEWER1.OverView.Camera.ComputeMatrix();
       eventuallyRender();
-    }
-    if (VIEWER2) {
-      VIEWER2.SetViewport([left+width1, 0, width2, height]);
-      eventuallyRender();
-    }
+    }   
   };
   
   // Reset Cavas CSS properties
   VIEWER1.MainView.Canvas.css({
-    'position': 'static',
+    'position': 'absolute',
     'bottom' : "auto",
     'height': "auto",
     'border': "none"
   });  
   
   // Trick to fix overview position
-  var divWrapper = $('<div>').prependTo(container);
-  divWrapper.css({
-    'position': 'absolute',
-    'right' : "5px",
-    'top': "5px"
-  });
   VIEWER1.OverView.Canvas.css({
-    'position': 'static',
     'cursor': options.overview_cursor
   });    
   
   VIEWER1.OverView.Color = options.overview_color
   
-  VIEWER1.OverView.Canvas.appendTo(divWrapper);
   VIEWER1.MainView.Camera.FocalPoint = [options.center[0], options.center[1], 10.0];
   VIEWER1.MainView.Camera.Height = options.viewHeight;
   

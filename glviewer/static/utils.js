@@ -36,6 +36,9 @@ function StartVisualizationSession(container, userOptions) {
     "center" : [0,0,0],
     "overview_cursor" : 'default',
     "overview_color" : "#4011E5",
+    "overview_padding": 12,
+    "overview_width_percentage": 15, 
+    "overview_height_percentage": 30, 
     "rotation" : 0,
     "viewHeight" : 22000,
     "imgPath" : "static/",
@@ -88,40 +91,37 @@ function StartVisualizationSession(container, userOptions) {
     }
     // The remaining width is split between the two viewers.
     var width1 = (width-left) * VIEWER1_FRACTION;
-    var width2 = (width-left) - width1;
     if (VIEWER1) {
+
+       var overViewWidth = width1 * options.overview_width_percentage/100;
+       var overViewHeight = height * options.overview_height_percentage/100;
+       var overViewport = [left + width1 - overViewWidth - options.overview_padding, 
+                        height - overViewHeight - options.overview_padding,
+                        overViewWidth,
+                        overViewHeight];
+        
       VIEWER1.SetViewport([left, 0, width1, height]);
+      VIEWER1.OverView.SetViewport(overViewport);
+      VIEWER1.OverView.Camera.ComputeMatrix();
       eventuallyRender();
-    }
-    if (VIEWER2) {
-      VIEWER2.SetViewport([left+width1, 0, width2, height]);
-      eventuallyRender();
-    }
+    }   
   };
   
   // Reset Cavas CSS properties
   VIEWER1.MainView.Canvas.css({
-    'position': 'static',
+    'position': 'absolute',
     'bottom' : "auto",
     'height': "auto",
     'border': "none"
   });  
   
   // Trick to fix overview position
-  var divWrapper = $('<div>').prependTo(container);
-  divWrapper.css({
-    'position': 'absolute',
-    'right' : "5px",
-    'top': "5px"
-  });
   VIEWER1.OverView.Canvas.css({
-    'position': 'static',
     'cursor': options.overview_cursor
   });    
   
   VIEWER1.OverView.Color = options.overview_color
   
-  VIEWER1.OverView.Canvas.appendTo(divWrapper);
   VIEWER1.MainView.Camera.FocalPoint = [options.center[0], options.center[1], 10.0];
   VIEWER1.MainView.Camera.Height = options.viewHeight;
   

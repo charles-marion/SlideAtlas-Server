@@ -23,7 +23,8 @@ function View (viewport, layer) { // connectome: remove cache arg to constructor
   this.OutlineCamMatrix = mat4.create();
   
   // 2d canvas
-  if ( ! GL) {
+  if ( !GL) {
+    
     // Add a new canvas.
     this.Canvas = $('<canvas>').appendTo(CANVAS).css({
         'position': 'absolute',

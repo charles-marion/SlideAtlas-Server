@@ -37,6 +37,7 @@ function Viewer (viewport, cache) {
     var overViewport = [viewport[0] + viewport[2]*0.8, 
                         viewport[1] + viewport[3]*0.8,
                         viewport[2]*0.18, viewport[3]*0.18];
+       
     this.OverView = new View(overViewport, 2);
     this.OverView.Camera.ZRange = [-1,0];
     this.OverView.Camera.FocalPoint = [13000.0, 11000.0, 10.0];
@@ -847,10 +848,12 @@ Viewer.prototype.ConstrainCamera = function () {
   if (cam.Height > 2*(bounds[3]-bounds[2])) {
     cam.Height = 2*(bounds[3]-bounds[2]);
     modified = true;
+    this.ZoomTarget = cam.Height;
   }  
   if (cam.Height < viewport[3] * spacing * 0.5) {
     cam.Height = viewport[3] * spacing * 0.5;
     modified = true;
+    this.ZoomTarget = cam.Height;
   }
   if (modified) {
     cam.ComputeMatrix();
@@ -878,10 +881,9 @@ Viewer.prototype.HandleMouseDown = function(event) {
         x < this.OverView.Viewport[0]+this.OverView.Viewport[2] &&
         y < this.OverView.Viewport[1]+this.OverView.Viewport[3]) {
       this.OverViewEventFlag = true;
-      // Transform to view's coordinate system.
       x = x - this.OverView.Viewport[0];
       y = y - this.OverView.Viewport[1];
-      this.OverViewPlaceCamera(x, y);
+      this.OverViewPlaceCamera(x-2, y);
       return;
     }
   }
@@ -991,7 +993,7 @@ Viewer.prototype.HandleMouseMove = function(event) {
   if (this.OverViewEventFlag) {
     x = x - this.OverView.Viewport[0];
     y = y - this.OverView.Viewport[1];
-    this.OverViewPlaceCamera(x, y);
+    this.OverViewPlaceCamera(x-2, y);
     // Animation handles the render.
     return;
   }
@@ -1037,6 +1039,11 @@ Viewer.prototype.HandleMouseWheel = function(event) {
   // we want to acumilate the target, but not the duration.
   var wheelDelta = event.SystemEvent.wheelDelta;
   if(this.ReverseMouseWheel) wheelDelta = -wheelDelta;
+  
+  var spacing = this.MainView.GetLeafSpacing();
+  var viewport = this.MainView.GetViewport();
+  var cam = this.MainView.Camera;
+  var bounds = this.MainView.GetBounds();
   
   var tmp = wheelDelta;
   while (tmp > 0) {

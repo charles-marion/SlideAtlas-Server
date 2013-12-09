@@ -260,14 +260,6 @@ Camera.prototype.Draw = function (overview) {
 
     // The 2d canvas was left in world coordinates.
     var ctx = overview.Context2d;
-    /*
-    ctx.beginPath();
-    //ctx.strokeStyle="#E500E5";
-    ctx.rect(this.FocalPoint[0]-(0.5*width),this.FocalPoint[1]-(0.5*height),width,height); 
-    //ctx.fillStyle="#E500E5";
-    //ctx.fillRect(this.FocalPoint[0]-(0.5*width),this.FocalPoint[1]-(0.5*height),width,height); 
-    ctx.stroke();
-    */
     ctx.save();
     ctx.setTransform(1,0,0,1,0,0);
     if(typeof overview.Color != undefined)
