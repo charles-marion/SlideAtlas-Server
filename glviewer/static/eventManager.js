@@ -449,7 +449,7 @@ EventManager.prototype.HandleTouchMove = function(e) {
   // Put a throttle on events
   if ( ! this.HandleTouch(e, false)) { return; }
 
-  if (NAVIGATION_WIDGET.Visibility) {
+  if (typeof NAVIGATION_WIDGET != "undefined" &&  NAVIGATION_WIDGET.Visibility) {
     // No slide interaction with the interface up.
     // I had bad interaction with events going to browser.
     NAVIGATION_WIDGET.ToggleVisibility();

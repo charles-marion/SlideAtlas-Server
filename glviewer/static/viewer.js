@@ -33,17 +33,17 @@ function Viewer (viewport, cache) {
   this.MainView.OutlineColor = [0,0,0];
   this.MainView.Camera.ZRange = [0,1];
   this.MainView.Camera.ComputeMatrix();
-  if ( ! MOBILE_DEVICE || MOBILE_DEVICE == "iPad") {
-    var overViewport = [viewport[0] + viewport[2]*0.8, 
-                        viewport[1] + viewport[3]*0.8,
-                        viewport[2]*0.18, viewport[3]*0.18];
-       
-    this.OverView = new View(overViewport, 2);
-    this.OverView.Camera.ZRange = [-1,0];
-    this.OverView.Camera.FocalPoint = [13000.0, 11000.0, 10.0];
-    this.OverView.Camera.Height = 22000.0;
-    this.OverView.Camera.ComputeMatrix();
-  }
+  
+  var overViewport = [viewport[0] + viewport[2]*0.8, 
+                      viewport[1] + viewport[3]*0.8,
+                      viewport[2]*0.18, viewport[3]*0.18];
+
+  this.OverView = new View(overViewport, 2);
+  this.OverView.Camera.ZRange = [-1,0];
+  this.OverView.Camera.FocalPoint = [13000.0, 11000.0, 10.0];
+  this.OverView.Camera.Height = 22000.0;
+  this.OverView.Camera.ComputeMatrix();
+  
   this.ZoomTarget = this.MainView.Camera.GetHeight();
   this.RollTarget = this.MainView.Camera.Roll;
 
@@ -845,8 +845,8 @@ Viewer.prototype.ConstrainCamera = function () {
     cam.FocalPoint[1] = bounds[3];
     modified = true;
   }
-  if (cam.Height > 2*(bounds[3]-bounds[2])) {
-    cam.Height = 2*(bounds[3]-bounds[2]);
+  if (cam.Height > 10*(bounds[3]-bounds[2])) {
+    cam.Height = 10*(bounds[3]-bounds[2]);
     modified = true;
     this.ZoomTarget = cam.Height;
   }  
@@ -859,10 +859,6 @@ Viewer.prototype.ConstrainCamera = function () {
     cam.ComputeMatrix();
   }
 }
-
-  
-  
-  
 
 
 Viewer.prototype.HandleMouseDown = function(event) {
