@@ -357,7 +357,6 @@ EventManager.prototype.DetectSweepEvent = function(dx,dy) {
           if ((this.LastMouseX-sweep.Location[0])*sweep.Direction[0] +
               (this.LastMouseY-sweep.Location[1])*sweep.Direction[1] < 0.0) {
             this.SelectedSweepListener = sweep;
-            console.log("sweep " + sweep.Label);
           }
         }
       }
@@ -438,8 +437,13 @@ EventManager.prototype.HandleTouchStart = function(e) {
 
   this.ChooseViewer();
   if (this.CurrentViewer) {
-    if (this.CurrentViewer.HandleTouchStart(this) && NAVIGATION_WIDGET.Visibility) {
-      NAVIGATION_WIDGET.ToggleVisibility();
+    if (this.CurrentViewer.HandleTouchStart(this)) {
+      if (NAVIGATION_WIDGET.Visibility) {
+        NAVIGATION_WIDGET.ToggleVisibility();
+      }
+      if (MOBILE_ANNOTATION_WIDGET.Visibility) {
+        MOBILE_ANNOTATION_WIDGET.ToggleVisibility();
+      }
     }
   }  
 }
@@ -453,6 +457,12 @@ EventManager.prototype.HandleTouchMove = function(e) {
     // No slide interaction with the interface up.
     // I had bad interaction with events going to browser.
     NAVIGATION_WIDGET.ToggleVisibility();
+  }
+    
+  if (MOBILE_ANNOTATION_WIDGET.Visibility) {
+    // No slide interaction with the interface up.
+    // I had bad interaction with events going to browser.
+    MOBILE_ANNOTATION_WIDGET.ToggleVisibility();
   }
     
   this.ChooseViewer();  
@@ -474,7 +484,6 @@ EventManager.prototype.HandleTouchEnd = function(e) {
   e.preventDefault();
 
   var t = new Date().getTime();
-  console.log("TouchEnd "+t);
   this.LastTime = this.Time;
   this.Time = t;
 
@@ -483,6 +492,7 @@ EventManager.prototype.HandleTouchEnd = function(e) {
     this.StartTouchTime = 0;
     if (t < 90) {
       NAVIGATION_WIDGET.ToggleVisibility();
+      MOBILE_ANNOTATION_WIDGET.ToggleVisibility();
       return;
     }
     if (this.CurrentViewer) {
@@ -492,8 +502,6 @@ EventManager.prototype.HandleTouchEnd = function(e) {
 }
 
 EventManager.prototype.HandleTouchCancel = function(event) {
-  console.log("touchCancel");
-  this.TouchState = TOUCH_NONE;
   this.MouseDown = false;
 }
 

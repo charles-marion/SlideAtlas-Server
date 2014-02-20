@@ -121,6 +121,9 @@ Cache.prototype.GetSource=function()
 
 Cache.prototype.LoadRoots = function () {
     var qTile;
+    if ( this.Image.dimensions == undefined) {
+	return;
+    }
     for (var slice = 1; slice <= this.Image.dimensions[2]; ++slice) {
         qTile = this.GetTile(slice, 0, 0);
         LoadQueueAdd(qTile);
@@ -158,6 +161,7 @@ Cache.prototype.LoadRoots = function () {
 // ------ I think this method really belongs in the view! -----------
 // This could get expensive because it is called so often.
 // Eventually I want a quick coverage test to exit early.
+// iPad flag includes low resolution ancestors to get rid of white lines between tiles.
 Cache.prototype.ChooseTiles = function(view, slice, tiles) {
   // I am prioritizing tiles in the queue by time stamp.
   // Loader sets the the tiles time stamp.
@@ -245,14 +249,22 @@ Cache.prototype.ChooseTiles = function(view, slice, tiles) {
   // Logic for progressive rendering is in the loader:
   // Do not load a tile if its parent is not loaded.
   var tiles = [];
-  var tileIds = this.GetVisibleTileIds(level, bounds);
-  var tile;
-  for (var i = 0; i < tileIds.length; ++i) {
-    tile = this.GetTile(slice, level, tileIds[i]);
-    // If the tile is loaded or loading,
-    // this does nothing.
-    LoadQueueAdd(tile);
-    tiles.push(tile);
+  var endLevel = level;
+  // GetTile is inefficient and may be causing the ipad to render slowly.
+  if (I_PAD_FLAG) {
+    // Get rid of white line by rendering all ancestors.
+    endLevel = 0;
+  }
+  for (var i = level; i >= endLevel; --i) {
+    var tileIds = this.GetVisibleTileIds(i, bounds);
+    var tile;
+    for (var j = 0; j < tileIds.length; ++j) {
+      tile = this.GetTile(slice, i, tileIds[j]);
+      // If the tile is loaded or loading,
+      // this does nothing.
+      LoadQueueAdd(tile);
+      tiles.push(tile);
+    }
   }
   
   // Preload the next slice.
@@ -402,6 +414,8 @@ Cache.prototype.RecursiveGetTile = function(node, deltaDepth, x, y, z) {
   }
   return this.RecursiveGetTile(child, deltaDepth, x, y, z);
 }
+
+
 
 
 // Find the oldest tile, remove it from the tree and return it to be recycled.

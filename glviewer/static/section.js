@@ -67,7 +67,7 @@ Section.prototype.LoadRoots = function () {
 Section.prototype.FindImage = function (imageCollectionName) {
   for (var i = 0; i < this.Caches.length; ++i) {
     var cache = this.Caches[i];
-    if (cache.ImageId == imageCollectionName) {
+    if (cache.Image._id == imageCollectionName) {
       return cache;
     }
   }
@@ -114,7 +114,7 @@ Section.prototype.Draw = function (view, context) {
         if (tiles[j].LoadState < 3) {
           eventuallyRender();
         }
-        if (tiles[j].Parent) { // Queue up the parent.
+        if (tiles[j].Parent && ! I_PAD_FLAG) { // Queue up the parent.
           // Note: Parents might be added multiple times by different siblings.
           tiles.push(tiles[j].Parent);
         }

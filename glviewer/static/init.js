@@ -18,7 +18,8 @@ var tileVertexTextureCoordBuffer;
 var tileCellBuffer;
 
 var MOBILE_DEVICE = false;
-
+// Hack to get rid of white lines.
+var I_PAD_FLAG = false;
 
 
 function detectMobile() { 
@@ -34,6 +35,7 @@ function detectMobile() {
   }
   if ( navigator.userAgent.match(/iPad/i)) {
    MOBILE_DEVICE = "iPad";
+   I_PAD_FLAG = true;
   }
   if ( navigator.userAgent.match(/iPod/i)) {
    MOBILE_DEVICE = "iPod";
@@ -425,5 +427,31 @@ function GC_transform(m00,m10,m01,m11,m02,m12) {
   GCT = [n00,n10,n01,n11,n02,n12];
   GC.setTransform(n00,n10,n01,n11,n02,n12);
 }
+
+
+
+
+
+//----------------------------------------------------------
+// Log to trackdown iPad bug.  Console does not log until
+// debugger is running.  Bug does not occur when debugger 
+// is running.
+
+LOGGING = false;
+DEBUG_LOG = [];
+
+function StartLogging (message) {
+  if (LOGGING) return;
+  LOGGING = true;
+  //alert("Error: Check log");
+}
+
+function LogMessage (message) {
+  if (LOGGING) {
+    DEBUG_LOG.push(message);
+  }
+}
+
+
 
 
