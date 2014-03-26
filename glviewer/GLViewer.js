@@ -351,7 +351,7 @@ function CopyZoom() {
     var copyCam = VIEWER1.GetCamera();
   }
   
-  viewer.AnimateCamera(cam.FocalPoint, cam.Roll, copyCam.Height);
+  viewer.AnimateCamera(cam.GetFocalPoint(), cam.Roll, copyCam.Height);
 }
 
 
@@ -364,7 +364,7 @@ function FlipHorizontal() {
 
     var cam = viewer.GetCamera();
     viewer.ToggleMirror();
-    viewer.SetCamera(cam.FocalPoint, cam.GetRotation()+180.0, cam.Height);
+    viewer.SetCamera(cam.GetFocalPoint(), cam.GetRotation()+180.0, cam.Height);
     RecordState();
 }
 
@@ -481,7 +481,8 @@ function ViewBrowserAddSessionViews(sessionData) {
     for (var i = 0; i < sessionData.images.length; ++i) {
       var image = sessionData.images[i];
       var item = $('<li>').appendTo(viewList)
-          .attr('db', image.db)
+          // image.db did not work for ibriham stack (why?)
+          .attr('db', sessionData.db)
           .attr('sessid', sessionData.sessid)
           .attr('viewid', image.view)
           .click(function(){ViewBrowserImageCallback(this);});
@@ -765,7 +766,22 @@ function AnnotationWidget (viewer, container, imgPath) {
       .attr('type','image')
       .attr('src',imgPath+"/Pencil-icon.jpg")
       .click(function(){self.NewPencil();});
+    this.SaveButton = $('<img>').appendTo(this.ToolsTable)
+      .css({'height': '28px'})
+      .attr('type','image')
+      .attr('src',"webgl-viewer/static/save.png")
+      .click(function(){self.SaveBrownNote();});
   }
+}
+
+
+AnnotationWidget.prototype.SaveBrownNote = function() {
+  NOTES_WIDGET.SaveBrownNote(); 
+  this.SaveButton.hide();
+  var button = this.SaveButton;
+  setTimeout(function(){
+               button.show();
+             }, 1000); // one second
 }
 
 AnnotationWidget.prototype.SetVisibility = function(visibility) {
@@ -875,10 +891,10 @@ AnnotationWidget.prototype.NewCircle = function() {
 
 // Maybe students can link to the instructor recording session.  The could add notes which are added to the recording.
 
-// It might be nice to know where the mouse is pointing at all times.  We need a pointing tool. That is alot of events though.  LATER....
+// It might be nice to know where the mouse is pointing at all times.  We need a pointing tool. That is many events though.  LATER....
 
 // Design issue:
-// Should I save the state at the end of a move or the begining?  I chose end.  Although begining is easier,
+// Should I save the state at the end of a move or the beginning?  I chose end.  Although beginning is easier,
 // I like just popping the last state off the TIME_LINE and pushing to the REDO_STACK
 
 
@@ -1287,7 +1303,8 @@ var tileVertexTextureCoordBuffer;
 var tileCellBuffer;
 
 var MOBILE_DEVICE = false;
-
+// Hack to get rid of white lines.
+var I_PAD_FLAG = false;
 
 
 function detectMobile() { 
@@ -1303,6 +1320,7 @@ function detectMobile() {
   }
   if ( navigator.userAgent.match(/iPad/i)) {
    MOBILE_DEVICE = "iPad";
+   I_PAD_FLAG = true;
   }
   if ( navigator.userAgent.match(/iPod/i)) {
    MOBILE_DEVICE = "iPod";
@@ -1697,6 +1715,32 @@ function GC_transform(m00,m10,m01,m11,m02,m12) {
 
 
 
+
+
+//----------------------------------------------------------
+// Log to trackdown iPad bug.  Console does not log until
+// debugger is running.  Bug does not occur when debugger 
+// is running.
+
+LOGGING = false;
+DEBUG_LOG = [];
+
+function StartLogging (message) {
+  if (LOGGING) return;
+  LOGGING = true;
+  //alert("Error: Check log");
+}
+
+function LogMessage (message) {
+  if (LOGGING) {
+    DEBUG_LOG.push(message);
+  }
+}
+
+
+
+
+
 // Make this a singlton (effectively) for now.
 // Two levels of caching and pruning.
 // Image without an associated texture map.
@@ -1951,6 +1995,17 @@ function Camera (viewportWidth, viewportHeight) {
 }
 
 
+Camera.prototype.SetViewport = function (viewport) {
+  if (10*viewport[3] < viewport[2]) {
+    alert("Unusual viewport " + viewport[3]);
+    return;
+  }
+  this.ViewportWidth = viewport[2];
+  this.ViewportHeight = viewport[3];
+}
+
+
+
 Camera.prototype.GetRotation = function () {
     return this.Roll * 180.0 / 3.1415926535;
 }
@@ -1959,6 +2014,16 @@ Camera.prototype.GetFocalPoint = function () {
   // Copy to avoid bugs because arrays are shared.
   // These are nasty to find.
   return [this.FocalPoint[0],this.FocalPoint[1],this.FocalPoint[2]]; 
+}
+
+Camera.prototype.SetFocalPoint = function (x, y) {
+  if (isNaN(x) || isNaN(y)) {
+    console.log("iPad bug: Camera went crazy.");
+    return;
+  }
+  this.FocalPoint[0] = x;
+  this.FocalPoint[1] = y;
+  // Ignore z on purpose.
 }
 
 // dx, dy are in view coordinates [-0.5,0.5].  
@@ -2011,9 +2076,11 @@ Camera.prototype.HandleRoll = function (x,y, dx, dy) {
 }
 
 
-
-
 Camera.prototype.Translate = function (dx,dy,dz) {
+  if (isNaN(dx) || isNaN(dy) || isNaN(dz)) {
+    console.log("iPad bug: Camera went crazy.");
+    return;
+  }
   this.FocalPoint[0] += dx;
   this.FocalPoint[1] += dy;
   this.FocalPoint[2] += dz;
@@ -2024,6 +2091,16 @@ Camera.prototype.Translate = function (dx,dy,dz) {
 Camera.prototype.GetHeight = function () {
   return this.Height;
 }
+
+
+Camera.prototype.SetHeight = function (height) {
+  if (isNaN(height)) {
+    console.log("iPad bug: Camera went crazy.");
+    return;
+  }
+  this.Height = height;
+}
+
 
 Camera.prototype.GetWidth = function () {
   return this.Height * this.ViewportWidth / this.ViewportHeight;
@@ -2040,21 +2117,39 @@ Camera.prototype.ComputeMatrix = function () {
     var y = this.FocalPoint[1];
     var z = this.FocalPoint[2];
     var w = this.GetWidth();
-    var h = this.GetHeight();
+    // var ht = this.GetHeight();  The iPad got this wrong?????
+    var ht = this.Height;
 
-    if (this.Mirror) { h = -h; }
+    if (ht > 1000000) {
+      StartLogging();
+      LogMessage("First height is big " + this.height);
+    }
+    if (w < 0) { return; }
+
+    if (this.Mirror) { ht = -ht; }
     
     mat4.identity(this.Matrix);
 
     this.Matrix[0] = c;
-    this.Matrix[1] = s*w/h;
+    this.Matrix[1] = s*w/ht;
     this.Matrix[4] =  -s;
-    this.Matrix[5] =  c*w/h;
+    this.Matrix[5] =  c*w/ht;
     this.Matrix[10]=  (this.ZRange[1]-this.ZRange[0])*0.5;
     this.Matrix[12]= -c*x + s*y;
-    this.Matrix[13]= (w/h)*(-s*x - c*y);
+    this.Matrix[13]= (w/ht)*(-s*x - c*y);
     this.Matrix[14]=  -z + (this.ZRange[1]+this.ZRange[0])*0.25*w;
     this.Matrix[15]=  0.5*w;
+
+  if (Math.abs(this.Matrix[5]) < 0.01 &&
+      Math.abs(this.Matrix[4]) < 0.01) {
+    StartLogging();
+    LogMessage("m[4] " + this.Matrix[4]);
+    LogMessage("m[5] " + this.Matrix[4]);
+    LogMessage("c = " + c);
+    LogMessage("w = " + w);
+    LogMessage("ht = " + ht);
+    LogMessage("height = " + this.Height);
+  }
 }
 
 // TODO: ROOT_SPACING IS UNDEFINED.
@@ -2067,18 +2162,11 @@ Camera.prototype.Reset = function () {
     bounds[3] = TILE_DIMENSIONS[1] * ROOT_SPACING[1];
     bounds[5] = NUMBER_OF_SECTIONS * ROOT_SPACING[2];
 
-    this.FocalPoint[0] = (bounds[0] + bounds[1]) * 0.5;
-    this.FocalPoint[1] = (bounds[2] + bounds[3]) * 0.5;
+    this.SetFocalPoint((bounds[0] + bounds[1]) * 0.5,
+                       (bounds[2] + bounds[3]) * 0.5);
     // We would need to set slice as well.
     //this.FocalPoint[2] = (bounds[4] + bounds[5]) * 0.5;
-    this.Height = bounds[3]-bounds[2];
-    this.ComputeMatrix();
-}
-
-Camera.prototype.Translate = function (dx,dy,dz) {
-    this.FocalPoint[0] += dx;
-    this.FocalPoint[1] += dy;
-    this.FocalPoint[2] += dz;
+    this.SetHeight(bounds[3]-bounds[2]);
     this.ComputeMatrix();
 }
 
@@ -2430,8 +2518,8 @@ Tile.prototype.Draw = function (program, context) {
     // map pixels to Tile
     // assume tile is 256x256
     // Shift a half pixel (white line fix) Draw tile one pixel bigger.
-    if (MOBILE_DEVICE == "iPad") {
-      context.transform(1.0/256, 0.0, 0.0, 1.0/256, -0.5/255.0, -0.5/255.0);  
+    if (I_PAD_FLAG) {
+      context.transform(1.0/256.0, 0.0, 0.0, 1.0/256.0, 0.0, 0.0);  
     } else {
       context.transform(1.0/255.5, 0.0, 0.0, 1.0/255.5, -0.25/255.0, -0.25/255.0);  
     }
@@ -2602,6 +2690,9 @@ Cache.prototype.GetSource=function()
 
 Cache.prototype.LoadRoots = function () {
     var qTile;
+    if ( this.Image.dimensions == undefined) {
+	return;
+    }
     for (var slice = 1; slice <= this.Image.dimensions[2]; ++slice) {
         qTile = this.GetTile(slice, 0, 0);
         LoadQueueAdd(qTile);
@@ -2639,6 +2730,7 @@ Cache.prototype.LoadRoots = function () {
 // ------ I think this method really belongs in the view! -----------
 // This could get expensive because it is called so often.
 // Eventually I want a quick coverage test to exit early.
+// iPad flag includes low resolution ancestors to get rid of white lines between tiles.
 Cache.prototype.ChooseTiles = function(view, slice, tiles) {
   // I am prioritizing tiles in the queue by time stamp.
   // Loader sets the the tiles time stamp.
@@ -2726,14 +2818,22 @@ Cache.prototype.ChooseTiles = function(view, slice, tiles) {
   // Logic for progressive rendering is in the loader:
   // Do not load a tile if its parent is not loaded.
   var tiles = [];
-  var tileIds = this.GetVisibleTileIds(level, bounds);
-  var tile;
-  for (var i = 0; i < tileIds.length; ++i) {
-    tile = this.GetTile(slice, level, tileIds[i]);
-    // If the tile is loaded or loading,
-    // this does nothing.
-    LoadQueueAdd(tile);
-    tiles.push(tile);
+  var endLevel = level;
+  // GetTile is inefficient and may be causing the ipad to render slowly.
+  if (I_PAD_FLAG) {
+    // Get rid of white line by rendering all ancestors.
+    endLevel = 0;
+  }
+  for (var i = level; i >= endLevel; --i) {
+    var tileIds = this.GetVisibleTileIds(i, bounds);
+    var tile;
+    for (var j = 0; j < tileIds.length; ++j) {
+      tile = this.GetTile(slice, i, tileIds[j]);
+      // If the tile is loaded or loading,
+      // this does nothing.
+      LoadQueueAdd(tile);
+      tiles.push(tile);
+    }
   }
   
   // Preload the next slice.
@@ -2885,6 +2985,8 @@ Cache.prototype.RecursiveGetTile = function(node, deltaDepth, x, y, z) {
 }
 
 
+
+
 // Find the oldest tile, remove it from the tree and return it to be recycled.
 // This also prunes texture maps.
 // PRUNE_TIME_TILES and PRUNE_TIME_TEXTURES are compared with used time of tile.
@@ -3013,7 +3115,7 @@ Section.prototype.LoadRoots = function () {
 Section.prototype.FindImage = function (imageCollectionName) {
   for (var i = 0; i < this.Caches.length; ++i) {
     var cache = this.Caches[i];
-    if (cache.ImageId == imageCollectionName) {
+    if (cache.Image._id == imageCollectionName) {
       return cache;
     }
   }
@@ -3060,7 +3162,7 @@ Section.prototype.Draw = function (view, context) {
         if (tiles[j].LoadState < 3) {
           eventuallyRender();
         }
-        if (tiles[j].Parent) { // Queue up the parent.
+        if (tiles[j].Parent && ! I_PAD_FLAG) { // Queue up the parent.
           // Note: Parents might be added multiple times by different siblings.
           tiles.push(tiles[j].Parent);
         }
@@ -3217,8 +3319,7 @@ View.prototype.SetViewport = function(viewport) {
   }
   
   this.Viewport = viewport;
-  this.Camera.ViewportWidth = viewport[2];
-  this.Camera.ViewportHeight = viewport[3];
+  this.Camera.SetViewport(viewport);
 }
 
 // Note: Tile in the list may not be loaded yet.
@@ -3323,6 +3424,9 @@ function Viewer (viewport, cache) {
   // Some of these could get transitioned to view or style ...
   // Left click option: Drag in main window, place in overview.
   this.OverViewEventFlag = false;
+  
+  this.EnableCursorChange = false;
+  this.CurrentCursor = "default";
 
   // Interaction state:
   // What to do for mouse move or mouse up.
@@ -3334,34 +3438,58 @@ function Viewer (viewport, cache) {
   this.AnimateLast;
   this.AnimateDuration = 0.0;
   this.TranslateTarget = [0.0,0.0];
+  this.UpdateCallback = function(){};
   
   this.MainView = new View(viewport, 1);
   this.MainView.OutlineColor = [0,0,0];
   this.MainView.Camera.ZRange = [0,1];
   this.MainView.Camera.ComputeMatrix();
-  if ( ! MOBILE_DEVICE || MOBILE_DEVICE == "iPad") {
-    var overViewport = [viewport[0] + viewport[2]*0.8, 
-                        viewport[1] + viewport[3]*0.8,
-                        viewport[2]*0.18, viewport[3]*0.18];
-       
-    this.OverView = new View(overViewport, 2);
-    this.OverView.Camera.ZRange = [-1,0];
-    this.OverView.Camera.FocalPoint = [13000.0, 11000.0, 10.0];
-    this.OverView.Camera.Height = 22000.0;
-    this.OverView.Camera.ComputeMatrix();
-  }
+  
+  var overViewport = [viewport[0] + viewport[2]*0.8, 
+                      viewport[1] + viewport[3]*0.8,
+                      viewport[2]*0.18, viewport[3]*0.18];
+
+  this.OverView = new View(overViewport, 2);
+  this.OverView.Camera.ZRange = [-1,0];
+  this.OverView.Camera.FocalPoint = [13000.0, 11000.0, 10.0];
+  this.OverView.Camera.Height = 22000.0;
+  this.OverView.Camera.ComputeMatrix();
+  
   this.ZoomTarget = this.MainView.Camera.GetHeight();
   this.RollTarget = this.MainView.Camera.Roll;
 
   this.AnnotationVisibility = ANNOTATION_OFF;
+  this.AnnotationEditable = true;
   this.ShapeList = [];
   this.WidgetList = [];
   this.ActiveWidget = null;
+  this.SelectedWidget = null;
 
   this.DoubleClickX = 0; 
   this.DoubleClickY = 0;
 
   this.GuiElements = [];
+}
+
+Viewer.prototype.SetCursorChange = function(v)
+{
+  this.EnableCursorChange = v;
+}
+
+Viewer.prototype.SetUpdateCallback = function(callback)
+{
+  this.UpdateCallback = callback;
+}
+
+// Canvas support only
+Viewer.prototype.SetCursor = function(cssvalue)
+{
+  if(!this.EnableCursorChange)return;
+  if(!GL && this.CurrentCursor != cssvalue)
+    {
+    this.MainView.Canvas.css('cursor', cssvalue);
+    }
+  this.CurrentCursor = cssvalue;
 }
 
 Viewer.prototype.GetAnnotationVisibility = function() {
@@ -3370,6 +3498,14 @@ Viewer.prototype.GetAnnotationVisibility = function() {
   
 Viewer.prototype.SetAnnotationVisibility = function(vis) {
   this.AnnotationVisibility = vis;
+}  
+
+Viewer.prototype.GetAnnotationEditable = function() {
+  return this.AnnotationEditable;
+}
+  
+Viewer.prototype.SetAnnotationEditable = function(vis) {
+  this.AnnotationEditable = vis;
 }  
 
 
@@ -3415,9 +3551,9 @@ Viewer.prototype.SetSection = function(section) {
     this.OverView.Section = section;
     //this.ShapeList = section.Markers;
     var bounds = section.GetBounds();
-    this.OverView.Camera.Height = bounds[3]-bounds[2];
-    this.OverView.Camera.FocalPoint[0] = 0.5*(bounds[0]+bounds[1]);
-    this.OverView.Camera.FocalPoint[1] = 0.5*(bounds[2]+bounds[3]);
+    this.OverView.Camera.SetHeight(bounds[3]-bounds[2]);
+    this.OverView.Camera.SetFocalPoint(0.5*(bounds[0]+bounds[1]),
+                                       0.5*(bounds[2]+bounds[3]));
     this.OverView.Camera.ComputeMatrix();
   }
   eventuallyRender();
@@ -3432,15 +3568,15 @@ Viewer.prototype.SetCache = function(cache) {
     if (cache) {
       var bds = cache.GetBounds();
       if (bds) {
-        this.OverView.Camera.FocalPoint[0] = (bds[0] + bds[1]) / 2;
-        this.OverView.Camera.FocalPoint[1] = (bds[2] + bds[3]) / 2;
+        this.OverView.Camera.SetFocalPoint((bds[0] + bds[1]) / 2,
+                                           (bds[2] + bds[3]) / 2);
         var height = (bds[3]-bds[2]);
         // See if the view is constrained by the width.
         var height2 = (bds[1]-bds[0]) * this.OverView.Viewport[3] / this.OverView.Viewport[2];
         if (height2 > height) {
           height = height2;
         }
-        this.OverView.Camera.Height = height;
+        this.OverView.Camera.SetHeight(height);
         this.OverView.Camera.ComputeMatrix();
       }
     }
@@ -3578,12 +3714,10 @@ Viewer.prototype.AnimateCamera = function(center, rotation, height) {
 // This is used to set the default camera so the complexities 
 // of the target and overview are hidden.
 Viewer.prototype.SetCamera = function(center, rotation, height) {
-  this.MainView.Camera.Height = height;
+  this.MainView.Camera.SetHeight(height);
   this.ZoomTarget = height;    
 
-  this.MainView.Camera.FocalPoint[0] = center[0];
-  this.MainView.Camera.FocalPoint[1] = center[1];
-  //this.MainView.Camera.FocalPoint[2] = center[2];
+  this.MainView.Camera.SetFocalPoint(center[0], center[1]);
   this.TranslateTarget[0] = center[0];
   this.TranslateTarget[1] = center[1];
   
@@ -3606,16 +3740,16 @@ Viewer.prototype.GetCamera = function() {
 Viewer.prototype.GetSpacing = function() {
   var cam = this.GetCamera();
   var viewport = this.GetViewport();
-  return cam.Height / viewport[3];
+  return cam.GetHeight() / viewport[3];
 }
 
 // I could merge zoom methods if position defaulted to focal point.
 Viewer.prototype.AnimateDoubleClickZoom = function(factor, position) {
-  this.ZoomTarget = this.MainView.Camera.Height * factor;
+  this.ZoomTarget = this.MainView.Camera.GetHeight() * factor;
   if (this.ZoomTarget < 0.9 / (1 << 5)) {
     this.ZoomTarget = 0.9 / (1 << 5);
   }
-  factor = this.ZoomTarget / this.MainView.Camera.Height; // Actual factor after limit.
+  factor = this.ZoomTarget / this.MainView.Camera.GetHeight(); // Actual factor after limit.
   
   // Compute traslate target to keep position in the same place.
   this.TranslateTarget[0] = position[0] - factor * (position[0] - this.MainView.Camera.FocalPoint[0]);
@@ -3629,7 +3763,7 @@ Viewer.prototype.AnimateDoubleClickZoom = function(factor, position) {
 }
 
 Viewer.prototype.AnimateZoom = function(factor) {
-  this.ZoomTarget = this.MainView.Camera.Height * factor;
+  this.ZoomTarget = this.MainView.Camera.GetHeight() * factor;
   if (this.ZoomTarget < 0.9 / (1 << 5)) {
     this.ZoomTarget = 0.9 / (1 << 5);
   }
@@ -3647,7 +3781,7 @@ Viewer.prototype.AnimateTranslate = function(dx, dy) {
   this.TranslateTarget[0] = this.MainView.Camera.FocalPoint[0] + dx;
   this.TranslateTarget[1] = this.MainView.Camera.FocalPoint[1] + dy;
 
-  this.ZoomTarget = this.MainView.Camera.Height;
+  this.ZoomTarget = this.MainView.Camera.GetHeight();
   this.RollTarget = this.MainView.Camera.Roll;
   
   this.AnimateLast = new Date().getTime();
@@ -3662,7 +3796,7 @@ Viewer.prototype.AnimateRoll = function(dRoll) {
   dRoll *= Math.PI / 180.0;
   this.RollTarget = this.MainView.Camera.Roll + dRoll;
  
-  this.ZoomTarget = this.MainView.Camera.Height;
+  this.ZoomTarget = this.MainView.Camera.GetHeight();
   this.TranslateTarget[0] = this.MainView.Camera.FocalPoint[0];
   this.TranslateTarget[1] = this.MainView.Camera.FocalPoint[1];
 
@@ -3709,6 +3843,10 @@ Viewer.prototype.LoadWidget = function(obj) {
       var pl = new PolylineWidget(this, false);
       pl.Load(obj);
       break;
+    case "rectangle":    
+      var rectangle = new RectangleWidget(this, false);
+      rectangle.Load(obj);
+      break;
   }
 }
 
@@ -3732,7 +3870,9 @@ Viewer.prototype.DeactivateWidget = function(widget) {
   this.ActiveWidget = null;
 }
 
-
+Viewer.prototype.SetSelectedWidget = function(widget) {
+  this.SelectedWidget = widget;
+}
 
 Viewer.prototype.DegToRad = function(degrees) {
   return degrees * Math.PI / 180;
@@ -3770,6 +3910,30 @@ Viewer.prototype.Draw = function() {
     for(i in this.WidgetList){
       this.WidgetList[i].Draw(this.MainView, this.AnnotationVisibility);
     }
+
+    
+    if(this.SelectedWidget != null)
+      {
+      if(typeof this.SelectedWidget.GetSelectBounds != 'undefined')
+        {
+        var bounds = this.SelectedWidget.GetSelectBounds();
+        var rectangle = new Polyline();
+        
+        var mainpt = [bounds[0][0] + 10, bounds[0][1] +10];
+        var pt = [bounds[1][0] + 10, bounds[1][1] +10];
+        rectangle.OutlineColor = [0.6, 0.6, 0.6];
+        rectangle.FixedSize = false;
+        rectangle.Points = [];
+        rectangle.Points.push(mainpt);
+        rectangle.Points.push([pt[0], mainpt[1]]);
+        rectangle.Points.push([pt[0], pt[1]]);
+        rectangle.Points.push([mainpt[0], pt[1]]);
+        rectangle.Points.push(mainpt);   
+        rectangle.Points.push([pt[0], mainpt[1]]);     
+        rectangle.UpdateBuffers();
+        rectangle.Draw(this.MainView)
+        }
+      }
   }
 
     // Draw a rectangle in the overview representing the camera's view.
@@ -3797,36 +3961,35 @@ Viewer.prototype.Animate = function() {
   var timeNow = new Date().getTime();
   if (timeNow >= (this.AnimateLast + this.AnimateDuration)) {
     // We have past the target. Just set the target values.
-    this.MainView.Camera.Height = this.ZoomTarget;
+    this.MainView.Camera.SetHeight(this.ZoomTarget);
     this.MainView.Camera.Roll = this.RollTarget;
     if (this.OverView) {
       this.OverView.Camera.Roll = this.RollTarget;
     }
-    this.MainView.Camera.FocalPoint[0] = this.TranslateTarget[0];
-    this.MainView.Camera.FocalPoint[1] = this.TranslateTarget[1];
+    this.MainView.Camera.SetFocalPoint(this.TranslateTarget[0],
+                                       this.TranslateTarget[1]);
 
     // Save the state when the animation is finished.
     RecordState();
   } else {
     // Interpolate
     var currentHeight = this.MainView.Camera.GetHeight();
-    var currentCenter = this.MainView.Camera.FocalPoint;
+    var currentCenter = this.MainView.Camera.GetFocalPoint();
     var currentRoll   = this.MainView.Camera.Roll;
-    this.MainView.Camera.Height
-      = currentHeight + (this.ZoomTarget-currentHeight)
-            *(timeNow-this.AnimateLast)/this.AnimateDuration;
+    this.MainView.Camera.SetHeight(
+          currentHeight + (this.ZoomTarget-currentHeight)
+            *(timeNow-this.AnimateLast)/this.AnimateDuration);
     this.MainView.Camera.Roll
       = currentRoll + (this.RollTarget-currentRoll)
             *(timeNow-this.AnimateLast)/this.AnimateDuration;
     if (this.OverView) {
       this.OverView.Camera.Roll = this.MainView.Camera.Roll;
     }
-    this.MainView.Camera.FocalPoint[0]
-      = currentCenter[0] + (this.TranslateTarget[0]-currentCenter[0])
-            *(timeNow-this.AnimateLast)/this.AnimateDuration;
-    this.MainView.Camera.FocalPoint[1]
-      = currentCenter[1] + (this.TranslateTarget[1]-currentCenter[1])
-            *(timeNow-this.AnimateLast)/this.AnimateDuration;
+    this.MainView.Camera.SetFocalPoint(
+        currentCenter[0] + (this.TranslateTarget[0]-currentCenter[0])
+            *(timeNow-this.AnimateLast)/this.AnimateDuration,
+        currentCenter[1] + (this.TranslateTarget[1]-currentCenter[1])
+            *(timeNow-this.AnimateLast)/this.AnimateDuration);
     // We are not finished yet.
     // Schedule another render
     eventuallyRender();
@@ -3876,14 +4039,30 @@ Viewer.prototype.HandleTouchStart = function(event) {
   if ( event.Touches.length >= 4) {
     var cam = this.GetCamera();
     var bds = this.MainView.Section.GetBounds();
-    cam.FocalPoint = [(bds[0]+bds[1])*0.5, (bds[2]+bds[3])*0.5];      
+    cam.SetFocalPoint( (bds[0]+bds[1])*0.5, (bds[2]+bds[3])*0.5);      
     cam.Roll = 0.0;
-    cam.Height = bds[3]-bds[2];
+    cam.SetHeight(bds[3]-bds[2]);
     cam.ComputeMatrix();
-    eventuallyRender();  
+    eventuallyRender();
+    // Return value hides navigation widget  
     return true;           
   }
   
+  // See if any widget became active.
+  if (this.AnnotationVisibility && this.AnnotationEditable) {
+    for (var touchIdx = 0; touchIdx < event.Touches.length; ++touchIdx) {
+      event.MouseX = event.Touches[touchIdx][0];
+      event.MouseY = event.Touches[touchIdx][1];
+      this.ComputeMouseWorld(event);
+      for (var i = 0; i < this.WidgetList.length; ++i) {
+        if ( ! this.WidgetList[i].GetActive() && 
+               this.WidgetList[i].CheckActive(event)) {
+          this.ActivateWidget(this.WidgetList[i]);
+          return true;
+        }
+      }
+    }
+  }    
   return false;
 }
 
@@ -3894,6 +4073,12 @@ Viewer.prototype.HandleTouchPan = function(event) {
     return;
   }
 
+  // Forward the events to the widget if one is active.
+  if (this.ActiveWidget != null) {
+    this.ActiveWidget.HandleTouchPan(event);
+    return;
+  }
+    
   // I see an odd intermittent camera matrix problem 
   // on the iPad that looks like a thread safety issue.
   if (this.MomentumTimerId) {
@@ -3921,8 +4106,7 @@ Viewer.prototype.HandleTouchPan = function(event) {
   this.MomentumScale = 0.0;
 
   var cam = this.GetCamera();
-  cam.FocalPoint[0] -= dx;  
-  cam.FocalPoint[1] -= dy;
+  cam.Translate( -dx, -dy, 0);  
   cam.ComputeMatrix();  
   eventuallyRender();  
 }
@@ -4036,7 +4220,17 @@ Viewer.prototype.HandleTouchPinch = function(event) {
     return;
   }
   scale = s1/ s0;
-        
+
+
+  // Forward the events to the widget if one is active.
+  if (this.ActiveWidget != null) {
+    event.PinchScale = scale;
+    this.ActiveWidget.HandleTouchPinch(event);
+    return;
+  }
+
+
+  
   // scale is around the mid point .....
   // we need to compute focal point height and roll (not just a matrix).
   // Focal point is the only difficult item.
@@ -4057,12 +4251,16 @@ Viewer.prototype.HandleTouchPinch = function(event) {
 
   cam.FocalPoint[0] = x;  
   cam.FocalPoint[1] = y;
-  cam.Height = cam.Height / scale;
+  cam.SetHeight(cam.GetHeight() / scale);
   cam.ComputeMatrix();  
   eventuallyRender();  
 }
 
 Viewer.prototype.HandleTouchEnd = function(event) {
+  if (this.ActiveWidget != null) {
+    this.ActiveWidget.HandleTouchEnd(event);
+    return;
+  }
   this.HandleMomentum(event);  
 }
 
@@ -4091,9 +4289,8 @@ Viewer.prototype.HandleMomentum = function(event) {
   var integ = (-k * decay + k);
   
   var cam = this.MainView.Camera;
-  cam.FocalPoint[0] -= this.MomentumX * integ;  
-  cam.FocalPoint[1] -= this.MomentumY * integ;
-  cam.Height = cam.Height / ((this.MomentumScale * integ) + 1);
+  cam.Translate(-(this.MomentumX * integ), -(this.MomentumY * integ), 0);
+  cam.SetHeight(cam.Height / ((this.MomentumScale * integ) + 1));
   cam.Roll = cam.Roll - (this.MomentumRoll* integ);
   cam.ComputeMatrix();
   if (this.OverView) {
@@ -4101,8 +4298,11 @@ Viewer.prototype.HandleMomentum = function(event) {
     cam2.Roll = cam.Roll;
     cam2.ComputeMatrix();  
   }
-  eventuallyRender();
-  
+  // I think the problem with the ipad is thie asynchronous render.
+  // Maybe two renders occur at the same time.
+  //eventuallyRender();
+  draw();  
+
   // Decay the momentum.
   this.MomentumX *= decay;
   this.MomentumY *= decay;
@@ -4136,28 +4336,28 @@ Viewer.prototype.ConstrainCamera = function () {
 
   var modified = false;
   if (cam.FocalPoint[0] < bounds[0]) {
-    cam.FocalPoint[0] = bounds[0];
+    cam.SetFocalPoint(bounds[0], cam.FocalPoint[1]);
     modified = true;
   }
   if (cam.FocalPoint[0] > bounds[1]) {
-    cam.FocalPoint[0] = bounds[1];
+    cam.SetFocalPoint(bounds[1], cam.FocalPoint[1]);
     modified = true;
   }
   if (cam.FocalPoint[1] < bounds[2]) {
-    cam.FocalPoint[1] = bounds[2];
+    cam.SetFocalPoint(cam.FocalPoint[0], bounds[2]);
     modified = true;
   }
   if (cam.FocalPoint[1] > bounds[3]) {
-    cam.FocalPoint[1] = bounds[3];
+    cam.SetFocalPoint(cam.FocalPoint[0], bounds[3]);
     modified = true;
   }
-  if (cam.Height > 2*(bounds[3]-bounds[2])) {
-    cam.Height = 2*(bounds[3]-bounds[2]);
+  if (cam.Height > 10*(bounds[3]-bounds[2])) {
+    cam.Height = 10*(bounds[3]-bounds[2]);
     modified = true;
     this.ZoomTarget = cam.Height;
   }  
-  if (cam.Height < viewport[3] * spacing * 0.5) {
-    cam.Height = viewport[3] * spacing * 0.5;
+  if (cam.GetHeight() < viewport[3] * spacing * 0.5) {
+    cam.SetHeight(viewport[3] * spacing * 0.5);
     modified = true;
     this.ZoomTarget = cam.Height;
   }
@@ -4165,10 +4365,6 @@ Viewer.prototype.ConstrainCamera = function () {
     cam.ComputeMatrix();
   }
 }
-
-  
-  
-  
 
 
 Viewer.prototype.HandleMouseDown = function(event) {
@@ -4227,19 +4423,14 @@ Viewer.prototype.HandleDoubleClick = function(event) {
 }
 
 Viewer.prototype.HandleMouseUp = function(event) {
+
+   this.ComputeMouseWorld(event);
   // Forward the events to the widget if one is active.
   if (this.ActiveWidget != null) {
     this.ActiveWidget.HandleMouseUp(event);
     return;
   }
 
-  // Dragging is handled by the camera.  This needs to 
-  // change before I can use momentum.
-  //if (this.InteractionState == INTERACTION_DRAG) {
-  //  this.HandleMomentum();
-  //  return;
-  //}
-  
   if (this.InteractionState != INTERACTION_NONE) {
     this.InteractionState = INTERACTION_NONE;
     RecordState();
@@ -4249,8 +4440,7 @@ Viewer.prototype.HandleMouseUp = function(event) {
 }
 
 
-
-Viewer.prototype.HandleMouseMove = function(event) {
+Viewer.prototype.ComputeMouseWorld = function(event) {
   // Many shapes, widgets and interactors will need the mouse in world coodinates.
   var x = event.MouseX;
   var y = event.MouseY;
@@ -4272,7 +4462,10 @@ Viewer.prototype.HandleMouseMove = function(event) {
   var det = m[0]*m[5] - m[1]*m[4];
   event.MouseWorldX = (x*m[5]-y*m[4]+m[4]*m[13]-m[5]*m[12]) / det;
   event.MouseWorldY = (y*m[0]-x*m[1]-m[0]*m[13]+m[1]*m[12]) / det;
-    
+}
+
+Viewer.prototype.HandleMouseMove = function(event) {
+  this.ComputeMouseWorld(event);
   // Forward the events to the widget if one is active.
   if (this.ActiveWidget != null) {
     this.ActiveWidget.HandleMouseMove(event);
@@ -4280,7 +4473,7 @@ Viewer.prototype.HandleMouseMove = function(event) {
   }
   
   // See if any widget became active.
-  if (event.SystemEvent.which == 0 && this.AnnotationVisibility) {
+  if (this.AnnotationVisibility && this.AnnotationEditable) {
     for (var i = 0; i < this.WidgetList.length; ++i) {
       if (this.WidgetList[i].CheckActive(event)) {
         this.ActivateWidget(this.WidgetList[i]);
@@ -4288,6 +4481,8 @@ Viewer.prototype.HandleMouseMove = function(event) {
       }
     }
   }
+  
+  this.SetCursor("default");
     
   if (event.MouseDown == false) {
     return;
@@ -4321,8 +4516,9 @@ Viewer.prototype.HandleMouseMove = function(event) {
     this.RollTarget = this.MainView.Camera.Roll;
   } else if (this.InteractionState == INTERACTION_ZOOM) {
     var dy = event.MouseDeltaY / this.MainView.Viewport[2];
-    this.MainView.Camera.Height *= (1.0 + (dy* 5.0));
-    this.ZoomTarget = this.MainView.Camera.Height;
+    this.MainView.Camera.SetHeight(this.MainView.Camera.GetHeight() 
+                                    * (1.0 + (dy* 5.0)));
+    this.ZoomTarget = this.MainView.Camera.GetHeight();
     this.MainView.Camera.ComputeMatrix();
   } else if (this.InteractionState == INTERACTION_DRAG) {
     // Translate
@@ -4579,6 +4775,7 @@ function ArrowWidget (viewer, newFlag) {
     return null;
   }
   this.Viewer = viewer;
+  this.IsTextActive = false;
 
   // Wait to create this until the first move event.
   this.Shape = new Arrow();
@@ -4587,6 +4784,12 @@ function ArrowWidget (viewer, newFlag) {
   this.Shape.OutlineColor = [1.0, 1.0, 1.0];
   this.Shape.Length = 50;
   this.Shape.Width = 8;
+  
+  this.IsShapeUpdate = false;
+  
+  this.TextShape = false;
+  this.DrawnCallback = function(widget){};
+  
   // Note: If the user clicks before the mouse is in the
   // canvas, this will behave odd.
   this.TipPosition = [0,0];
@@ -4606,6 +4809,55 @@ function ArrowWidget (viewer, newFlag) {
 
 ArrowWidget.prototype.Draw = function(view) {
     this.Shape.Draw(view);
+    if(this.TextShape != false && this.TextShape.String != "")
+      {
+      this.UpdatetTextPosition();
+      this.TextShape.Draw(view);  
+      }
+    else if(this.Viewer.AnnotationEditable)
+      {
+      this.SetText("Add Label", 12)
+      this.TextShape.Color =  [0.6, 0.6, 0.6];
+      this.UpdatetTextPosition(view);
+      this.TextShape.Draw(view);
+      this.TextShape = false;
+      }
+}
+
+ArrowWidget.prototype.UpdatetTextPosition = function(view) {
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    this.TextShape.Position= this.Shape.Origin; 
+    var theta = this.Shape.Orientation * 3.1415926536 / 180.0;
+    var y = Math.sin( theta) * (this.Shape.PointBuffer[9]+4);
+    var x = Math.cos( theta) * (this.Shape.PointBuffer[9]+4);    
+    if(y < 0) y -= 5
+    this.TextShape.Anchor = [-x,-y];
+    }
+}
+
+ArrowWidget.prototype.GetSelectBounds = function() {
+  var theta = this.Shape.Orientation * 3.1415926536 / 180.0;
+  var y = Math.sin( theta) * (this.Shape.PointBuffer[9]);
+  var x = Math.cos( theta) * (this.Shape.PointBuffer[9]);    
+  x = this.Shape.Origin[0] + x/this.Viewer.GetPixelsPerUnit();
+  y = this.Shape.Origin[1] + y/this.Viewer.GetPixelsPerUnit();
+  var pt1 = [this.Shape.Origin[0], this.Shape.Origin[1]];
+  var pt2 = [x, y];
+  return [pt1,pt2];
+}
+
+ArrowWidget.prototype.SetDrawnCallback = function(callback) {
+    this.DrawnCallback = callback;
+}
+
+ArrowWidget.prototype.SetText = function(text, height) {
+  this.TextShape = new Text();
+  this.TextShape.String = text;  
+  this.TextShape.Size = height;  
+  this.TextShape.Color = this.Shape.FillColor;
+  this.TextShape.Position= this.Shape.Origin; 
+  this.TextShape.UpdateBuffers(); 
 }
 
 
@@ -4634,6 +4886,12 @@ ArrowWidget.prototype.Serialize = function() {
   obj.orientation = this.Shape.Orientation;
   obj.fixedsize = this.Shape.FixedSize;
   obj.fixedorientation = this.Shape.FixedOrientation;
+  
+  obj.test = "";
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    obj.text = this.TextShape.String;
+    }
 
   return obj;
 }
@@ -4658,7 +4916,6 @@ ArrowWidget.prototype.Load = function(obj) {
   } else {
     this.Shape.FixedOrientation = (obj.fixedorientation == "true");
   }
-
   this.Shape.UpdateBuffers();
 }
 
@@ -4720,6 +4977,9 @@ ArrowWidget.prototype.HandleMouseUp = function(event) {
     this.State = ARROW_WIDGET_PROPERTIES_DIALOG;
     this.ShowPropertiesDialog();
   } else if (this.State != ARROW_WIDGET_PROPERTIES_DIALOG) {
+    this.DrawnCallback(this);
+    if(this.IsShapeUpdate)this.Viewer.UpdateCallback(this);
+    this.IsShapeUpdate = false;
     this.SetActive(false);
   }
 }
@@ -4737,6 +4997,7 @@ ArrowWidget.prototype.HandleMouseMove = function(event) {
     var viewport = this.Viewer.GetViewport();    
     this.Shape.Origin = this.Viewer.ConvertPointViewerToWorld(x+this.TipOffset[0], y+this.TipOffset[1]);
     eventuallyRender();
+    this.IsShapeUpdate = true;
   }
 
   if (this.State == ARROW_WIDGET_DRAG_TAIL) { 
@@ -4751,6 +5012,7 @@ ArrowWidget.prototype.HandleMouseMove = function(event) {
     this.Shape.Orientation = Math.atan2(dy, dx) * 180.0 / Math.PI;
     this.Shape.UpdateBuffers();
     eventuallyRender();
+    this.IsShapeUpdate = true;
   }
 
   if (this.State == ARROW_WIDGET_WAITING) { 
@@ -4790,16 +5052,64 @@ ArrowWidget.prototype.CheckActive = function(event) {
     length *= pixelsPerUnit;
     halfWidth *= pixelsPerUnit;
   }
+  
+  this.IsTextActive = false;
+  
+  var textOriginScreenPixelPosition;
+  var tMouseX = null;
+  var tMouseY = null;
+  
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    textOriginScreenPixelPosition = this.Viewer.ConvertPointWorldToViewer(this.TextShape.Position[0],this.TextShape.Position[1]);
+    
+    tMouseX = (event.MouseX - textOriginScreenPixelPosition[0]) + this.TextShape.Anchor[0];  
+    tMouseY = (event.MouseY - textOriginScreenPixelPosition[1]) + this.TextShape.Anchor[1];  
+   
+    if (tMouseX > this.TextShape.PixelBounds[0] && tMouseX < this.TextShape.PixelBounds[1] &&
+      tMouseY > this.TextShape.PixelBounds[2] && tMouseY < this.TextShape.PixelBounds[3])
+      {
+      this.SetActive(true);
+      this.IsTextActive = true;
+      this.Viewer.SetCursor("text");
+      return true;
+      }
+    }
+  else if(this.Viewer.AnnotationEditable)
+    {      
+    var theta = this.Shape.Orientation * 3.1415926536 / 180.0;
+    var yAnchor = Math.sin( theta) * (this.Shape.PointBuffer[9]+4);
+    var xAnchor  = Math.cos( theta) * (this.Shape.PointBuffer[9]+4);    
+    if(yAnchor < 0) yAnchor -= 5
+    textOriginScreenPixelPosition = this.Viewer.ConvertPointWorldToViewer(this.Shape.Origin[0], this.Shape.Origin[1]);
+    tMouseX = (event.MouseX - textOriginScreenPixelPosition[0]  - xAnchor );  
+    tMouseY = (event.MouseY - textOriginScreenPixelPosition[1] - yAnchor  - 6);  
+    if(tMouseX > 0 && tMouseX < 70 && Math.abs(tMouseY) < 6)   
+      {
+      this.SetActive(true);
+      this.IsTextActive = true;
+      this.Viewer.SetCursor("text");
+      return true;
+      }
+    }
+  
 
   this.ActiveTail = false;
   if (xNew > 0.0 && xNew < length && yNew > -halfWidth && yNew < halfWidth) {
     this.SetActive(true);
     // Save the position along the arrow to decide which drag behavior to use.
-    if (xNew > length - halfWidth) {
+    if (xNew > length - halfWidth*4) 
+      {
       this.ActiveTail = true;
-    }
+      this.Viewer.SetCursor("col-resize");
+      }
+    else
+      {
+      this.Viewer.SetCursor("move");
+      }
     return true;
   } else {
+    this.Viewer.SetCursor("move");
     this.SetActive(false);
     return false;
   }
@@ -4824,11 +5134,13 @@ ArrowWidget.prototype.SetActive = function(flag) {
   if (flag) {
     this.State = ARROW_WIDGET_ACTIVE;  
     this.Shape.Active = true;
+    if(this.TextShape != false) this.TextShape.Active = true;
     this.Viewer.ActivateWidget(this);
     eventuallyRender();
   } else {
     this.State = ARROW_WIDGET_WAITING;
     this.Shape.Active = false;
+    if(this.TextShape != false) this.TextShape.Active = false;
     this.Viewer.DeactivateWidget(this);
     eventuallyRender();
   }
@@ -4914,11 +5226,20 @@ var CIRCLE_WIDGET_ACTIVE = 4; // Mouse is over the widget and it is receiving ev
 var CIRCLE_WIDGET_PROPERTIES_DIALOG = 5; // Properties dialog is up
 
 function CircleWidget (viewer, newFlag) {
+  this.Tolerance = 0.05;
+  if (MOBILE_DEVICE) {
+    this.Tolerance = 0.1;
+  }
+
   if (viewer == null) {
     return;
   }
   this.Popup = new WidgetPopup(this);
+  this.ShowPopup = true;
   this.Viewer = viewer;
+  this.IsTextActive = false;
+  this.IsShapeUpdate = false;
+  this.MiddleCrossOffset = 100;
   var cam = viewer.MainView.Camera;
   var viewport = viewer.MainView.Viewport;
   this.Shape = new Circle();
@@ -4927,6 +5248,9 @@ function CircleWidget (viewer, newFlag) {
   this.Shape.Radius = 50*cam.Height/viewport[3];
   this.Shape.LineWidth =  5.0*cam.Height/viewport[3];
   this.Shape.FixedSize = false;
+  
+  this.TextShape = false;
+  this.DrawnCallback = function(widget){};
   
   this.Viewer.WidgetList.push(this);
 
@@ -4939,11 +5263,82 @@ function CircleWidget (viewer, newFlag) {
     return;
   }
 
-  this.State = CIRCLE_WIDGET_WAITING;
+  this.State = CIRCLE_WIDGET_WAITING;  
 }
 
 CircleWidget.prototype.Draw = function(view) {
-    this.Shape.Draw(view);
+   this.Shape.Draw(view);
+   
+   // draw cross middle if editable
+   if(this.Viewer.AnnotationEditable && this.Shape.Radius > 200)
+     { 
+     var vertical = new Polyline();
+     vertical.OutlineColor = [0.6, 0.6, 0.6];
+     vertical.FixedSize = false;
+     vertical.Points = [];
+     vertical.Points.push([this.Shape.Origin[0] - this.MiddleCrossOffset, this.Shape.Origin[1]]);
+     vertical.Points.push([this.Shape.Origin[0] + this.MiddleCrossOffset, this.Shape.Origin[1]]);
+     vertical.UpdateBuffers();
+     vertical.Draw(view)     
+          
+     var horizontal = new Polyline();     
+     horizontal.OutlineColor = [0.6, 0.6, 0.6];     
+     horizontal.FixedSize = false;
+     horizontal.Points = [];
+     horizontal.Points.push([this.Shape.Origin[0], this.Shape.Origin[1] - this.MiddleCrossOffset]);
+     horizontal.Points.push([this.Shape.Origin[0], this.Shape.Origin[1] + this.MiddleCrossOffset]);
+     horizontal.UpdateBuffers();
+     horizontal.Draw(view)
+     }
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    this.UpdatetTextPosition(view)
+    this.TextShape.Draw(view);  
+    }
+  else if(this.Viewer.AnnotationEditable)
+    {
+    this.SetText("Add Label", 12)
+    this.TextShape.Color =  [0.6, 0.6, 0.6];
+    this.UpdatetTextPosition(view);
+    this.TextShape.Draw(view);
+    this.TextShape = false;
+    }
+}
+
+CircleWidget.prototype.UpdatetTextPosition = function(view) {
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    this.TextShape.Position= this.Shape.Origin; 
+    var offset = -5 - this.Viewer.GetPixelsPerUnit()*this.Shape.Radius;
+    var scale = this.Viewer.MainView.Viewport[3] / this.Viewer.MainView.Camera.GetHeight();
+    view.Context2d.font = this.TextShape.Size+'pt Calibri';
+    var width = view.Context2d.measureText(this.TextShape.String).width;    
+    this.TextShape.Anchor = [width/2, offset - (scale * this.Shape.LineWidth)/2];
+    }
+}
+
+CircleWidget.prototype.GetSelectBounds = function() {
+  var offset = this.Shape.Radius;
+  var pt1 = [this.Shape.Origin[0]  - offset, this.Shape.Origin[1] + offset];
+  var pt2 = [this.Shape.Origin[0] + offset, this.Shape.Origin[1]- offset];
+  return [pt1,pt2];
+}
+
+CircleWidget.prototype.SetDrawnCallback = function(callback) {
+    this.DrawnCallback = callback;
+}
+
+CircleWidget.prototype.EnableWidgetPopup = function(enable) {
+    this.ShowPopup = (enable == 1 || enable);
+}
+
+CircleWidget.prototype.SetText = function(text, height) {
+  this.TextShape = new Text();
+  this.TextShape.String = text;  
+  this.TextShape.Size = height;  
+  this.TextShape.Color = this.Shape.OutlineColor;
+  this.TextShape.Position= this.Shape.Origin; 
+  this.TextShape.UpdateBuffers(); 
 }
 
 // This needs to be put in the Viewer.
@@ -4965,6 +5360,10 @@ CircleWidget.prototype.Serialize = function() {
   obj.outlinecolor = this.Shape.OutlineColor;
   obj.radius = this.Shape.Radius;
   obj.linewidth = this.Shape.LineWidth;
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    obj.text = this.TextShape.String;
+    }
   return obj;
 }
 
@@ -5000,6 +5399,7 @@ CircleWidget.prototype.HandleMouseDown = function(event) {
   if (this.State == CIRCLE_WIDGET_ACTIVE) {
     // Determine behavior from active radius.
     if (this.NormalizedActiveDistance < 0.5) {
+      this.Viewer.SetCursor("move");
       this.State = CIRCLE_WIDGET_DRAG;
     } else {
       this.OriginViewer = this.Viewer.ConvertPointWorldToViewer(this.Shape.Origin[0], this.Shape.Origin[1]);
@@ -5011,8 +5411,11 @@ CircleWidget.prototype.HandleMouseDown = function(event) {
 // returns false when it is finished doing its work.
 CircleWidget.prototype.HandleMouseUp = function(event) {
   if ( this.State == CIRCLE_WIDGET_DRAG ||  this.State == CIRCLE_WIDGET_DRAG_RADIUS) {
+    this.DrawnCallback(this);
     this.SetActive(false);
     RecordState();
+    if(this.IsShapeUpdate)this.Viewer.UpdateCallback(this);
+    this.IsShapeUpdate = false;
   }
 }
 
@@ -5027,6 +5430,7 @@ CircleWidget.prototype.HandleMouseMove = function(event) {
   
   if (this.State == CIRCLE_WIDGET_NEW || this.State == CIRCLE_WIDGET_DRAG) {
     this.Shape.Origin = this.Viewer.ConvertPointViewerToWorld(x, y);
+    this.IsShapeUpdate = true;
     eventuallyRender();
   }
   
@@ -5038,6 +5442,7 @@ CircleWidget.prototype.HandleMouseMove = function(event) {
     // Change units from pixels to world.
     this.Shape.Radius = Math.sqrt(dx*dx + dy*dy) * cam.Height / viewport[3];
     this.Shape.UpdateBuffers();
+    this.IsShapeUpdate = true;
     eventuallyRender();
   }
   
@@ -5046,10 +5451,37 @@ CircleWidget.prototype.HandleMouseMove = function(event) {
   } 
 }
 
+
+CircleWidget.prototype.HandleTouchPan = function(event) {
+  w0 = this.Viewer.ConvertPointViewerToWorld(event.LastMouseX, event.LastMouseY);
+  w1 = this.Viewer.ConvertPointViewerToWorld(    event.MouseX,     event.MouseY);
+    
+  // This is the translation.
+  var dx = w1[0] - w0[0];
+  var dy = w1[1] - w0[1];
+  
+  this.Shape.Origin[0] += dx;
+  this.Shape.Origin[1] += dy;
+  eventuallyRender();
+}
+
+CircleWidget.prototype.HandleTouchPinch = function(event) {  
+  this.Shape.Radius *= event.PinchScale;
+  this.Shape.UpdateBuffers();
+  eventuallyRender();
+}
+
+CircleWidget.prototype.HandleTouchEnd = function(event) {
+  this.SetActive(false);
+}
+
+
 CircleWidget.prototype.CheckActive = function(event) {
   var x = event.MouseX;
   var y = event.MouseY;
-
+  
+  this.IsTextActive = false;
+  
   // change dx and dy to vector from center of circle.
   if (this.FixedSize) {
     dx = event.MouseX - this.Shape.Origin[0];
@@ -5064,12 +5496,58 @@ CircleWidget.prototype.CheckActive = function(event) {
   var lineWidth = this.Shape.LineWidth / this.Shape.Radius;
   this.NormalizedActiveDistance = d;
   
+  var textOriginScreenPixelPosition;
+  var tMouseX = null;
+  var tMouseY = null;
+  
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    textOriginScreenPixelPosition = this.Viewer.ConvertPointWorldToViewer(this.TextShape.Position[0],this.TextShape.Position[1]);
+    
+    tMouseX = (x - textOriginScreenPixelPosition[0]) + this.TextShape.Anchor[0];  
+    tMouseY = (y - textOriginScreenPixelPosition[1]) + this.TextShape.Anchor[1];  
+   
+    if(tMouseX > this.TextShape.PixelBounds[0] && tMouseX < this.TextShape.PixelBounds[1] &&
+      tMouseY > this.TextShape.PixelBounds[2] && tMouseY < this.TextShape.PixelBounds[3])
+      {
+      this.Viewer.SetCursor("text");
+      active = true;
+      this.IsTextActive = true;
+      }
+    }
+  else if(this.Viewer.AnnotationEditable)
+    {
+    textOriginScreenPixelPosition = this.Viewer.ConvertPointWorldToViewer(this.Shape.Origin[0], this.Shape.Origin[1] + this.Shape.Radius);
+    tMouseX = (x - textOriginScreenPixelPosition[0] );  
+    tMouseY = (y - textOriginScreenPixelPosition[1] - 12);  
+    if(Math.abs(tMouseX) < 35 && Math.abs(tMouseY) < 6)   
+      {
+      this.SetActive(true);
+      this.IsTextActive = true;
+      this.Viewer.SetCursor("text");
+      return true;
+      }
+    }
+  
   if (this.Shape.FillColor == undefined) { // Circle 
-    if ((d < (1.05+lineWidth) && d > 0.95)  || d < (0.02+lineWidth)) {
+    if ((d < (1.0+ this.Tolerance +lineWidth) && d > (1.0-this.Tolerance))) {
+      var pt = this.Viewer.ConvertPointViewerToWorld(x, y);
+      if(pt[1] > (this.Shape.Origin[1] + this.Shape.Radius*0.5) ||
+        pt[1] < (this.Shape.Origin[1] - this.Shape.Radius*0.5))
+        {
+        this.Viewer.SetCursor("ns-resize");
+        }
+      else this.Viewer.SetCursor("ew-resize");
       active = true;
     }
+    else if(d < (this.Tolerance+lineWidth))
+      {
+      this.Viewer.SetCursor("move");
+      active = true;
+      }
   } else { // Disk
-    if (d < (1.05+lineWidth) && d > (0.1+lineWidth) || d < lineWidth) {
+    if (d < (1.0+this.Tolerance+lineWidth) && d > (this.Tolerance+lineWidth) || 
+        d < lineWidth) {
 	    active = true;
     }
   }
@@ -5090,6 +5568,7 @@ CircleWidget.prototype.Deactivate = function() {
   this.Popup.StartHideTimer(); 
   this.State = CIRCLE_WIDGET_WAITING;
   this.Shape.Active = false;
+  if(this.TextShape != false) this.TextShape.Active = false;
   this.Viewer.DeactivateWidget(this);
   eventuallyRender();
 }
@@ -5104,6 +5583,7 @@ CircleWidget.prototype.SetActive = function(flag) {
   if (flag) {
     this.State = CIRCLE_WIDGET_ACTIVE;  
     this.Shape.Active = true;
+    if(this.TextShape != false) this.TextShape.Active = true;
     this.Viewer.ActivateWidget(this);
     eventuallyRender();
     // Compute the location for the pop up and show it.
@@ -5111,10 +5591,11 @@ CircleWidget.prototype.SetActive = function(flag) {
     var x = this.Shape.Origin[0] + 0.8 * this.Shape.Radius * (Math.cos(roll) + Math.sin(roll));
     var y = this.Shape.Origin[1] + 0.8 * this.Shape.Radius * (Math.cos(roll) - Math.sin(roll));
     var pt = this.Viewer.ConvertPointWorldToViewer(x, y);
-    this.Popup.Show(pt[0],pt[1]);
+    if(this.ShowPopup) this.Popup.Show(pt[0],pt[1]);
   } else {
     this.Deactivate();
   }
+  eventuallyRender();
 }
 
 // Can we bind the dialog apply callback to an objects method?
@@ -5425,7 +5906,14 @@ TextWidget.prototype.ScreenPixelToTextPixelPoint = function(x,y) {
 
 TextWidget.prototype.HandleMouseMove = function(event) {
   if (this.State == TEXT_WIDGET_DRAG) {
-    this.Shape.Position = this.Viewer.ConvertPointViewerToWorld(event.MouseX, event.MouseY);
+    w0 = this.Viewer.ConvertPointViewerToWorld(event.LastMouseX, event.LastMouseY);
+    w1 = this.Viewer.ConvertPointViewerToWorld(    event.MouseX,     event.MouseY);
+    // This is the translation.
+    var dx = w1[0] - w0[0];
+    var dy = w1[1] - w0[1];
+
+    this.Shape.Position[0] += dx;
+    this.Shape.Position[1] += dy;
     this.AnchorShape.Origin = this.Shape.Position;
     eventuallyRender();
     return true;
@@ -5443,6 +5931,36 @@ TextWidget.prototype.HandleMouseMove = function(event) {
   }
   return true;
 }
+
+
+
+
+
+TextWidget.prototype.HandleTouchPan = function(event) {
+  // We should probably have a handle touch start too.
+  // Touch start calls CheckActive() ...
+  if (this.State == TEXT_WIDGET_ACTIVE) {
+    if (this.AnchorShape.Visibility && this.ActiveReason == 0) {
+      this.State = TEXT_WIDGET_DRAG_TEXT;
+    } else {
+      this.State = TEXT_WIDGET_DRAG;
+    }
+  }
+  event.MouseDeltaX = event.MouseX - event.LastMouseX;
+  event.MouseDeltaY = event.MouseY - event.LastMouseY;
+  this.HandleMouseMove(event);
+}
+TextWidget.prototype.HandleTouchPinch = function(event) {
+}
+TextWidget.prototype.HandleTouchEnd = function(event) {
+  this.State = TEXT_WIDGET_ACTIVE;
+  this.SetActive(false);
+}
+
+
+
+
+
 
 TextWidget.prototype.CheckActive = function(event) {
   var tMouse = this.ScreenPixelToTextPixelPoint(event.MouseX, event.MouseY);
@@ -5517,16 +6035,25 @@ TextWidget.prototype.ShowPropertiesDialog = function () {
   ta.value = this.Shape.String;
   var tm = document.getElementById("TextMarker");
   tm.checked = this.AnchorShape.Visibility;
+  $("#textwidgetcontent").keyup(function (e) { TextPropertyDialogApplyCheck();});
   
-  // hack to supress viewer key events.
+  // hack to suppress viewer key events.
   DIALOG_OPEN = true;
   // Can we bind the dialog apply callback to an objects method?
-  ARROW_WIDGET_DIALOG_SELF = this;
+  TEXT_WIDGET_DIALOG_SELF = this;
   $("#text-properties-dialog").dialog("open");
 }    
 
+// Two returns in a row is the same as apply.
+function TextPropertyDialogApplyCheck() {
+  var string = document.getElementById("textwidgetcontent").value;
+  if (string.length > 1 && string.slice(-2) == "\n\n") {
+    TextPropertyDialogApply();
+  }
+}
+
 function TextPropertyDialogApply() {
-  var widget = ARROW_WIDGET_DIALOG_SELF;
+  var widget = TEXT_WIDGET_DIALOG_SELF;
   if ( ! widget) { 
     return; 
   }
@@ -5553,6 +6080,8 @@ function TextPropertyDialogApply() {
   RecordState();
   
   eventuallyRender();
+  
+  $("#text-properties-dialog").dialog("close");
 }
 
 function TextPropertyDialogCancel() {
@@ -5873,6 +6402,17 @@ PolylineWidget.prototype.WhichVertexShouldBeActive = function(pt) {
   
   return -1;
 }
+
+
+
+PolylineWidget.prototype.HandleTouchPan = function(event) {
+}
+PolylineWidget.prototype.HandleTouchPinch = function(event) {
+}
+PolylineWidget.prototype.HandleTouchEnd = function(event) {
+}
+
+
     
 PolylineWidget.prototype.CheckActive = function(event) {
   var x = event.MouseX;
@@ -6031,26 +6571,36 @@ function PolylinePropertyDialogDelete() {
 
 
 
-function PencilWidget (viewer, newFlag) {
+function PencilWidget (viewer, newFlag, showIcon, oneLineOnly) {
   if (viewer == null) {
     return;
   }
+  if(typeof showIcon == "undefined") showIcon = true;
+  if(typeof oneLineOnly == "undefined") oneLineOnly = false;
   this.Viewer = viewer;    
   this.Viewer.WidgetList.push(this);
-
+  this.OutlineColor = [0.9, 1.0, 0.0];
+  this.TextShape = false;
+  this.OneLineOnly = oneLineOnly; // It means the widget is disable when mouse up
+  this.DrawnCallback = function(widget){};
+  
   this.Cursor = $('<img>').appendTo('body')
-      .css({
-        'position': 'absolute',
-        'height': '28px',
-        'z-index': '1'})
-      .attr('type','image')
-      .attr('src',"webgl-viewer/static/Pencil-icon.png");  
-
+    .css({
+      'position': 'absolute',
+      'height': '28px',
+      'z-index': '1'})
+    .attr('type','image')
+    .attr('src',"webgl-viewer/static/Pencil-icon.png");  
   this.Shapes = [];
   
-  if ( ! newFlag) {
+  if ( ! newFlag || !showIcon) {
       this.Cursor.hide();
   }
+  
+  if(newFlag)
+    {
+    this.Viewer.SetCursor("crosshair");
+    }
 }
 
 
@@ -6073,16 +6623,28 @@ PencilWidget.prototype.Serialize = function() {
     } 
     obj.shapes.push(points);
   }
-
   return obj;
 }
+
+PencilWidget.prototype.SetOutlineColor = function(c) {
+  this.OutlineColor = ConvertColor(c);
+  this.ApplyColor(this.OutlineColor);
+}
+
+PencilWidget.prototype.ApplyColor = function(color) {
+  for (var i = 0; i < this.Shapes.length; ++i) 
+    {
+    this.Shapes[i].OutlineColor = color;    
+    }
+}
+
 
 // Load a widget from a json object (origin MongoDB).
 PencilWidget.prototype.Load = function(obj) {
   for(var n=0; n < obj.shapes.length; n++){
     var points = obj.shapes[n];
     var shape = new Polyline();
-    shape.OutlineColor = [0.9, 1.0, 0.0];
+    shape.OutlineColor = this.OutlineColor
     shape.FixedSize = false;
     shape.LineWidth = 0;
     this.Shapes.push(shape);
@@ -6119,6 +6681,10 @@ PencilWidget.prototype.HandleMouseDown = function(event) {
   }
 }
 
+PencilWidget.prototype.SetDrawnCallback = function(callback) {
+    this.DrawnCallback = callback;
+}
+
 PencilWidget.prototype.HandleMouseUp = function(event) {
   if (event.SystemEvent.which == 3) {
     // Right mouse was pressed.
@@ -6129,6 +6695,7 @@ PencilWidget.prototype.HandleMouseUp = function(event) {
   if (event.SystemEvent.which == 2) {
     // Middle mouse was pressed.
     this.Deactivate();
+    this.DrawnCallback(this);
   }
 
   // A stroke has just been finished.
@@ -6136,6 +6703,11 @@ PencilWidget.prototype.HandleMouseUp = function(event) {
     var spacing = this.Viewer.GetSpacing();
     this.Decimate(this.Shapes[this.Shapes.length - 1], spacing);
     RecordState();
+  }
+  
+  if(this.OneLineOnly){
+    this.Deactivate();
+    this.DrawnCallback(this);
   }
 }
 
@@ -6162,6 +6734,15 @@ PencilWidget.prototype.HandleMouseMove = function(event) {
   }
   
 }
+
+
+PencilWidget.prototype.HandleTouchPan = function(event) {
+}
+PencilWidget.prototype.HandleTouchPinch = function(event) {
+}
+PencilWidget.prototype.HandleTouchEnd = function(event) {
+}
+
 
 PencilWidget.prototype.CheckActive = function(event) {
 }
@@ -6339,39 +6920,39 @@ WidgetPopup.prototype.HideTimerCallback = function() {
 
 
 
-// Notes canbe nested (tree structure) to allow for student questions, comments or discussion.
+// Notes can be nested (tree structure) to allow for student questions, comments or discussion.
 // Sessions could be notes.
 // Notes within the same level are ordered.
-// Question answers can be subnotes.
+// Question answers can be sub notes.
 
 // Students can save comments that are not seen by other students.
 // A separate "Notes" collection is used.
 // Notes keep an ID of their parent in the database.
 // The recording API is used to save the state of viewers (ViewerRecord)
-// Notes just add a tree structure ontop of these states (with GUI).
+// Notes just add a tree structure on top of these states (with GUI).
 
 // Right now we are loading the view and bookmarks as notes.
 // Bookmarks have two notes: Question and a child answer.  
-// I want to hide the answer in the quesetion note (not show the answer in the GUI).
+// I want to hide the answer in the question note (not show the answer in the GUI).
 // My problem is that the answer note does not have enough information to draw
-// the Question GUI.  It is burried in the iterator.  I could have a state
+// the Question GUI.  It is buried in the iterator.  I could have a state
 // internal to the question note, but this breaks the iterator pattern.
 // I am backing out of using the Answer array, but I am not removing it from the code.
 
 // TODO:
 // Save order of user notes.
-// Detect whether user has permision to save notes.
+// Detect whether user has permission to save notes.
 // Automatically save view changes into application note.
 // Automatically save note text and title into application.
 // Refresh button to reload the current note. (Reload from database.) (should I refresh children?).
 // Link the Save button to store all application notes into database.
 // Keep track of whether application notes have been modified.
-// Warning popup message to save notes when navigating off page.
+// Warning pop-up message to save notes when navigating off page.
 
 
-// Discusion:  We have a local (not saved to server) edit state (turned on by edit and off by cancel).
+// Discussion:  We have a local (not saved to server) edit state (turned on by edit and off by cancel).
 // Edit is turned off by advancing to the next note or adding a note.  This is confusing.
-// Changes are automatically saved locally. Save buttun saves to server.  This is confusing.
+// Changes are automatically saved locally. Save button saves to server.  This is confusing.
 
 
 // How about a global lock / unlock button (like quick). Edit -> Clone, Save, Cancel.
@@ -6381,6 +6962,9 @@ WidgetPopup.prototype.HideTimerCallback = function() {
 // Time to make this an object to get rid of all these global variables.
 function InitNotesWidget() {  
   NOTES_WIDGET = new NotesWidget();
+  if (EDIT) {
+    NOTES_WIDGET.EditCallback();  
+  }
 }
 
 
@@ -6409,7 +6993,7 @@ function NotesWidget() {
   this.DeleteButton;
   this.SaveButton;
   this.EditButton;
-  // We need this flag to record view and text into notes when advancing notees.
+  // We need this flag to record view and text into notes when advancing notes.
   this.EditActive = false;
   // We need this flag so cancel will get rid of a pending new note.
   // User can be editing an old note, or a new note.
@@ -7213,9 +7797,6 @@ Note.prototype.DisplayView = function() {
 }
 
 
-//------------------------------------------------------------------------------
-
-
 NotesWidget.prototype.SaveUserNote = function() {
   // Create a new note.
   var childNote = new Note();
@@ -7247,13 +7828,11 @@ NotesWidget.prototype.SaveUserNote = function() {
 
   // Save the note in the database for this specific user.
   // TODO: If author privileges, save note in the actual session / view.
-  var dbid = ARGS.Viewer1.db;
   var bug = JSON.stringify( childNote );
   $.ajax({
     type: "post",
     url: "/webgl-viewer/saveusernote",
     data: {"note": JSON.stringify(childNote.Serialize(false)),
-           "db"  : SESSION_DB,
            "date": d.getTime()},
     success: function(data,status) { childNote.Id = data;},
     error: function() { alert( "AJAX - error() : saveusernote" ); },
@@ -7264,6 +7843,30 @@ NotesWidget.prototype.SaveUserNote = function() {
   // which will also update the gui and viewers.
   NAVIGATION_WIDGET.NextNote();
 }
+
+
+NotesWidget.prototype.SaveBrownNote = function() {
+  // Create a new note.
+  var note = new Note();
+  note.RecordGUIChanges();
+  
+  // The note will want to know its context
+  parentNote = this.Iterator.GetNote();
+  note.ParentId = parentNote.Id;
+
+  // Save the note in the admin database for this specific user.
+  $.ajax({
+    type: "post",
+    url: "/webgl-viewer/saveusernote",
+    data: {"note": JSON.stringify(note.Serialize(false))},
+    success: function(data,status) { note.Id = data;},
+    error: function() { alert( "AJAX - error() : saveusernote" ); },
+    });  
+}
+
+
+
+
 
 NotesWidget.prototype.NoteModified = function () {
   this.Modified = true;
@@ -7386,8 +7989,10 @@ NotesWidget.prototype.EditCallback = function() {
   this.NewButton.show();
   this.SaveButton.show();
   // This handles making the note editable (including showing and hiding the delete button).
-  this.SelectedNote.Select();
-
+  if (this.SelectedNote) {
+    this.SelectedNote.Select();
+  }
+  
   // This handles making children sortable.
   var iter = this.RootNote.NewIterator();
   do {
@@ -7563,6 +8168,495 @@ NotesWidget.prototype.LoadViewId = function(viewId) {
 
 
   
+//==============================================================================
+// Mouse down places a point. Mouse up places the oposite point
+// Widget starts with an active vertex (mouse up).
+// Mouse down->up places the vertex and deactivates it.  A new deactive vertex is created.
+// Mouse drag at this point drages an edge from the last vertex.
+
+
+// Todo: Merge vertecies
+// Properties dialog for a point (or list).
+
+var RECTANGLE_WIDGET_NEW = 0;
+var RECTANGLE_WIDGET_NEW_FACE = 1;
+var RECTANGLE_WIDGET_WAITING = 2;
+var RECTANGLE_WIDGET_DRAG = 3;
+var RECTANGLE_WIDGET_ACTIVE = 5;
+var RECTANGLE_WIDGET_MOVETOP = 6;
+var RECTANGLE_WIDGET_MOVERIGHT = 7;
+var RECTANGLE_WIDGET_MOVEBOTTOM = 8;
+var RECTANGLE_WIDGET_MOVELEFT = 9;
+
+
+function RectangleWidget (viewer, newFlag) {
+  if (viewer === undefined) {
+    return;
+  }
+  var cam = viewer.MainView.Camera;
+  var viewport = viewer.MainView.Viewport;
+
+  this.Viewer = viewer;
+  this.IsTextActive = false;
+  this.CenterDragPoint = false;
+  this.MoveStatus = 0;
+
+  this.Shape = new Polyline();
+	this.Shape.OutlineColor = [0.0, 0.0, 0.0];
+  this.Shape.FixedSize = false;
+  this.MiddleCrossOffset = 100;
+  this.IsShapeUpdate = false;
+
+  this.Shape.Points[0] = [-50*cam.Height/viewport[3], -50*cam.Height/viewport[3]];
+  this.Shape.Points[1] = [0,0];
+  this.Shape.Points[2] = [50*cam.Height/viewport[3], 50*cam.Height/viewport[3]];
+  
+  this.TextShape = false;
+  
+  this.DrawnCallback = function(widget){};
+
+  this.Viewer.WidgetList.push(this);
+  
+  // Set line thickness   using viewer. (5 pixels).
+  this.Shape.LineWidth = 5.0*cam.Height/viewport[3];
+  
+  if (newFlag) {
+    this.State = RECTANGLE_WIDGET_NEW;
+    this.Shape.Active = true;
+    this.Viewer.ActivateWidget(this);
+  } else {
+    this.State = RECTANGLE_WIDGET_WAITING;
+  }
+  eventuallyRender();
+}
+
+RectangleWidget.prototype.Draw = function(view) {
+  this.Shape.Draw(view);
+  
+  // draw cross middle if editable
+  if(this.Viewer.AnnotationEditable)
+    { 
+    var vertical = new Polyline();
+    var center = [0,0];
+    center[0] = this.Shape.Points[0][0] - (this.Shape.Points[0][0] - this.Shape.Points[1][0])/2;
+    center[1] = this.Shape.Points[0][1] - (this.Shape.Points[0][1] - this.Shape.Points[2][1])/2;
+    
+    vertical.OutlineColor = [0.6, 0.6, 0.6];
+    vertical.FixedSize = false;
+    vertical.Points = [];
+    vertical.Points.push([center[0] - this.MiddleCrossOffset, center[1]]);
+    vertical.Points.push([center[0] + this.MiddleCrossOffset, center[1]]);
+    vertical.UpdateBuffers();
+    vertical.Draw(view)     
+
+    var horizontal = new Polyline();     
+    horizontal.OutlineColor = [0.6, 0.6, 0.6];     
+    horizontal.FixedSize = false;
+    horizontal.Points = [];
+    horizontal.Points.push([center[0], center[1] - this.MiddleCrossOffset]);
+    horizontal.Points.push([center[0], center[1] + this.MiddleCrossOffset]);
+    horizontal.UpdateBuffers();
+    horizontal.Draw(view)
+    }
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    this.UpdatetTextPosition(view);
+    this.TextShape.Draw(view);  
+    }
+  else if(this.Viewer.AnnotationEditable)
+    {
+    this.SetText("Add Label", 12)
+    this.TextShape.Color =  [0.6, 0.6, 0.6];
+    this.UpdatetTextPosition(view);
+    this.TextShape.Draw(view);
+    this.TextShape = false;
+    }
+}
+
+RectangleWidget.prototype.GetSelectBounds = function() {
+  var offset = this.Shape.LineWidth;
+  var pt1 = [this.Shape.Points[0][0] - offset, this.Shape.Points[0][1] - offset];
+  var pt2 = [this.Shape.Points[2][0] + offset, this.Shape.Points[2][1] + offset];
+  return [pt1,pt2];
+}
+
+RectangleWidget.prototype.SetDrawnCallback = function(callback) {
+    this.DrawnCallback = callback;
+}
+
+RectangleWidget.prototype.SetText = function(text, height) {
+  this.TextShape = new Text();
+  this.TextShape.String = text;  
+  this.TextShape.Size = height;  
+  this.TextShape.Color = this.Shape.OutlineColor;
+  this.TextShape.UpdateBuffers(); 
+}
+
+RectangleWidget.prototype.UpdatetTextPosition = function(view) {
+  if(this.TextShape != false && this.TextShape.String != "")
+    {    
+    this.TextShape.Position[0] = this.Shape.Points[0][0] + (this.Shape.Points[2][0] - this.Shape.Points[0][0])/2; 
+    this.TextShape.Position[1] = this.Shape.Points[2][1]; 
+    var scale = this.Viewer.MainView.Viewport[3] / this.Viewer.MainView.Camera.GetHeight();
+    view.Context2d.font = this.TextShape.Size+'pt Calibri';
+    var width = view.Context2d.measureText(this.TextShape.String).width;    
+    this.TextShape.Anchor = [width/2, -5 - (scale * this.Shape.LineWidth)/2];
+    this.TextShape.UpdateBuffers();
+    }
+}
+
+RectangleWidget.prototype.CheckActive = function(event) {
+  var x = event.MouseX;
+  var y = event.MouseY;
+  var pt = this.Viewer.ConvertPointViewerToWorld(x,y);
+  
+  this.IsTextActive = false;
+  
+  var textOriginScreenPixelPosition;
+  var tMouseX = null;
+  var tMouseY = null;
+  
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    textOriginScreenPixelPosition = this.Viewer.ConvertPointWorldToViewer(this.TextShape.Position[0],this.TextShape.Position[1]);
+
+    tMouseX = (x - textOriginScreenPixelPosition[0]) + this.TextShape.Anchor[0];  
+    tMouseY = (y - textOriginScreenPixelPosition[1]) + this.TextShape.Anchor[1];  
+    if (tMouseX != null && tMouseX > this.TextShape.PixelBounds[0] && tMouseX < this.TextShape.PixelBounds[1] &&
+    tMouseY > this.TextShape.PixelBounds[2] && tMouseY < this.TextShape.PixelBounds[3])
+      {
+      this.SetActive(true);
+      this.IsTextActive = true;
+      this.Viewer.SetCursor("text");
+      return true;
+      }
+    
+    }
+  else if(this.Viewer.AnnotationEditable)
+    {
+    var ptX = this.Shape.Points[0][0] + (this.Shape.Points[2][0] - this.Shape.Points[0][0])/2; 
+    var ptY = this.Shape.Points[2][1]; 
+    textOriginScreenPixelPosition = this.Viewer.ConvertPointWorldToViewer(ptX,ptY);
+
+    tMouseX = (x - textOriginScreenPixelPosition[0]);  
+    tMouseY = (y - textOriginScreenPixelPosition[1] - 12);  
+    
+    if(Math.abs(tMouseX) < 35 && Math.abs(tMouseY) < 6)   
+      {
+      this.SetActive(true);
+      this.IsTextActive = true;
+      this.Viewer.SetCursor("text");
+      return true;
+      }
+    }
+    
+  var center = [0,0];
+  center[0] = this.Shape.Points[0][0] - (this.Shape.Points[0][0] - this.Shape.Points[1][0])/2;
+  center[1] = this.Shape.Points[0][1] - (this.Shape.Points[0][1] - this.Shape.Points[2][1])/2;
+  if(center[0] + this.MiddleCrossOffset > pt[0] &&  center[0] - this.MiddleCrossOffset < pt[0] &&
+     center[1] + this.MiddleCrossOffset > pt[1] &&  center[1] - this.MiddleCrossOffset < pt[1] )
+     {
+     this.Viewer.SetCursor("move");
+     this.SetActive(true);
+     this.MoveStatus = RECTANGLE_WIDGET_DRAG;
+     return true;
+     }
+
+  // Check for mouse touching an edge.
+  for (var i = 1; i < this.Shape.Points.length; ++i) {
+    if (this.Shape.IntersectPointLine(pt, this.Shape.Points[i-1], this.Shape.Points[i], this.Shape.LineWidth)) {
+     this.SetActive(true);
+     if(this.Shape.Points[i-1][0] == this.Shape.Points[i][0])
+       {
+       if(this.Shape.Points[i-1][1] > this.Shape.Points[i][1])
+         {
+         this.MoveStatus = RECTANGLE_WIDGET_MOVELEFT;
+         }
+       else
+         {
+         this.MoveStatus = RECTANGLE_WIDGET_MOVERIGHT;
+         }
+       this.Viewer.SetCursor("ew-resize");
+       }
+     else
+       {
+       if(this.Shape.Points[i-1][0] > this.Shape.Points[i][0])
+         {
+         this.MoveStatus = RECTANGLE_WIDGET_MOVEBOTTOM;
+         }
+       else
+         {
+         this.MoveStatus = RECTANGLE_WIDGET_MOVETOP;
+         }
+       this.Viewer.SetCursor("ns-resize");
+       }
+
+     return true;
+    }
+  }
+  this.SetActive(false);
+  return false;
+}
+
+
+RectangleWidget.prototype.Serialize = function() {
+  if(this.Shape === undefined){ return null; }
+  var obj = new Object();
+  obj.type = "rectangle";
+  obj.outlinecolor = this.Shape.OutlineColor;
+  obj.linewidth = this.Shape.LineWidth;
+  obj.test = "";
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    obj.text = this.TextShape.String;
+    }
+  // Copy the points to avoid array reference bug.
+  obj.points = [];
+  for (var i = 0; i < this.Shape.Points.length; ++i) {
+    obj.points.push([this.Shape.Points[i][0], this.Shape.Points[i][1]]);
+  }
+  
+  obj.closedloop = this.ClosedLoop;
+  return obj;
+}
+
+// Load a widget from a json object (origin MongoDB).
+RectangleWidget.prototype.Load = function(obj) {
+  this.Shape.OutlineColor[0] = parseFloat(obj.outlinecolor[0]);
+  this.Shape.OutlineColor[1] = parseFloat(obj.outlinecolor[1]);
+  this.Shape.OutlineColor[2] = parseFloat(obj.outlinecolor[2]);
+  this.Shape.LineWidth = parseFloat(obj.linewidth);  
+  this.CreatePointArray(obj.points[0], obj.points[2]); 
+  this.ClosedLoop = (obj.closedloop == "true");
+}
+
+RectangleWidget.prototype.CreatePointArray = function(topLeft, bottomRight) {
+  var newTopLeft = [0, 0];
+  var newBottomRight = [0, 0];
+  if(topLeft[0]  < bottomRight[0])
+    {
+    newTopLeft[0] = topLeft[0];
+    newBottomRight[0] = bottomRight[0];
+    }
+  else
+    {
+    newTopLeft[0] = bottomRight[0];
+    newBottomRight[0] = topLeft[0];
+    }
+  if(topLeft[1] < bottomRight[1])
+    {
+    newTopLeft[1] = topLeft[1];
+    newBottomRight[1] = bottomRight[1];
+    }
+  else
+    {
+    newTopLeft[1] = bottomRight[1];
+    newBottomRight[1] = topLeft[1];
+    }
+  this.Shape.Points = [];
+  this.Shape.Points.push(newTopLeft);
+  this.Shape.Points.push([newBottomRight[0], newTopLeft[1]]);
+  this.Shape.Points.push([newBottomRight[0], newBottomRight[1]]);
+  this.Shape.Points.push([newTopLeft[0], newBottomRight[1]]);
+  this.Shape.Points.push(newTopLeft);    
+  this.Shape.Points.push([newBottomRight[0], newTopLeft[1]]);
+  this.Shape.UpdateBuffers();  
+}
+
+
+RectangleWidget.prototype.RemoveFromViewer = function() {
+  if (this.Viewer == null) {
+    return;
+  }
+  var idx = this.Viewer.WidgetList.indexOf(this);
+  if(idx!=-1) { 
+    this.Viewer.WidgetList.splice(idx, 1); 
+  }
+}
+
+
+
+RectangleWidget.prototype.HandleKeyPress = function(keyCode, shift) {
+}
+
+RectangleWidget.prototype.HandleDoubleClick = function(event) {
+}
+
+RectangleWidget.prototype.Deactivate = function() {
+  this.State = RECTANGLE_WIDGET_WAITING;
+  this.Viewer.DeactivateWidget(this);
+  this.Shape.Active = false;
+  if(this.TextShape != false) this.TextShape.Active = false;
+  eventuallyRender();
+}
+
+// Mouse down does nothing. Mouse up causes all state changes.
+RectangleWidget.prototype.HandleMouseDown = function(event) {
+  var x = event.MouseX;
+  var y = event.MouseY;
+  var pt = this.Viewer.ConvertPointViewerToWorld(x,y);
+  
+  if (this.State == RECTANGLE_WIDGET_NEW) {
+    this.State = RECTANGLE_WIDGET_NEW_FACE;
+    this.CenterDragPoint = pt;
+    eventuallyRender();
+    return;
+  }
+
+  if (this.State == RECTANGLE_WIDGET_ACTIVE) {
+    this.LastMouseWorld = pt;
+    this.State = this.MoveStatus;
+  }
+}
+
+// Returns false when it is finished doing its work.
+RectangleWidget.prototype.HandleMouseUp = function(event) {
+  var x = event.MouseX;
+  var y = event.MouseY;
+  var pt = this.Viewer.ConvertPointViewerToWorld(x,y);
+  if (this.State == RECTANGLE_WIDGET_NEW_FACE) {
+    this.Shape.UpdateBuffers();
+    eventuallyRender();
+    this.SetActive(false);
+    RecordState();
+    this.DrawnCallback(this);
+    if(this.IsShapeUpdate)this.Viewer.UpdateCallback(this);
+    this.IsShapeUpdate = false;
+    return;
+  }
+  
+  if(this.State == RECTANGLE_WIDGET_DRAG || this.State == RECTANGLE_WIDGET_MOVEBOTTOM ||
+      this.State == RECTANGLE_WIDGET_MOVETOP ||
+      this.State == RECTANGLE_WIDGET_MOVERIGHT ||
+      this.State == RECTANGLE_WIDGET_MOVELEFT)
+    {
+    eventuallyRender();
+    this.SetActive(false);
+    if(this.IsShapeUpdate)this.Viewer.UpdateCallback(this);
+    this.IsShapeUpdate = false;
+    RecordState();
+    }
+}
+
+
+RectangleWidget.prototype.HandleMouseMove = function(event) {
+  var x = event.MouseX;
+  var y = event.MouseY;
+  var pt = this.Viewer.ConvertPointViewerToWorld(x,y);
+  var topLeft;
+  var bottomRight;
+  
+  
+
+  if (this.State == RECTANGLE_WIDGET_NEW_FACE) {
+    var center =  this.CenterDragPoint;
+    var offset = [center[0] - pt[0], center[1] -pt[1]];  
+    var topleft = [center[0] - offset[0], center[1] - offset[1]];
+    var bottomright = [center[0] + offset[0], center[1] + offset[1]];
+    this.CreatePointArray(topleft, bottomright);
+   
+    this.Shape.UpdateBuffers();
+    eventuallyRender();
+    this.IsShapeUpdate = true;
+    return;
+  } 
+ else if(this.State == RECTANGLE_WIDGET_DRAG || this.State == RECTANGLE_WIDGET_NEW)
+   {
+   topLeft = this.Shape.Points[0];
+   bottomRight = this.Shape.Points[2];
+   
+   var newTopLeft = [(topLeft[0] - bottomRight[0])/2 + pt[0],
+                     -(bottomRight[1] - topLeft[1])/2 + pt[1]];
+   var newBottomRight = [-(topLeft[0] - bottomRight[0])/2 + pt[0],
+                     (bottomRight[1] - topLeft[1])/2 + pt[1]];
+                   
+   this.CreatePointArray(newTopLeft, newBottomRight);
+   eventuallyRender();
+   this.IsShapeUpdate = true;
+   return;
+   }
+ else if(this.State == RECTANGLE_WIDGET_MOVELEFT)
+   {
+   topLeft = this.Shape.Points[0];
+   topLeft[0] = pt[0];
+   bottomRight = this.Shape.Points[2];
+   this.CreatePointArray(topLeft, bottomRight);
+   eventuallyRender();
+   this.IsShapeUpdate = true;
+   return;
+   }
+ else if(this.State == RECTANGLE_WIDGET_MOVERIGHT)
+   {
+   topLeft = this.Shape.Points[0];
+   bottomRight = this.Shape.Points[2];
+   bottomRight[0] = pt[0];
+   this.CreatePointArray(topLeft, bottomRight);
+   eventuallyRender();
+   this.IsShapeUpdate = true;
+   return;
+   }
+ else if(this.State == RECTANGLE_WIDGET_MOVETOP)
+   {
+   topLeft = this.Shape.Points[0];
+   bottomRight = this.Shape.Points[2];
+   topLeft[1] = pt[1];
+   this.CreatePointArray(topLeft, bottomRight);
+   eventuallyRender();
+   this.IsShapeUpdate = true;
+   return;
+   }
+ else if(this.State == RECTANGLE_WIDGET_MOVEBOTTOM)
+   {
+   topLeft = this.Shape.Points[0];
+   bottomRight = this.Shape.Points[2];
+   bottomRight[1] = pt[1];
+   this.CreatePointArray(topLeft, bottomRight);
+   eventuallyRender();
+   this.IsShapeUpdate = true;
+   return;
+   }
+
+  
+ if (this.State == RECTANGLE_WIDGET_ACTIVE) {
+    this.CheckActive(event);
+  }
+}
+
+
+RectangleWidget.prototype.HandleTouchPan = function(event) {
+}
+RectangleWidget.prototype.HandleTouchPinch = function(event) {
+}
+RectangleWidget.prototype.HandleTouchEnd = function(event) {
+}
+
+// Multiple active states.  Active state is a bit confusing.
+// Only one state (WAITING) does not receive events from the viewer.
+RectangleWidget.prototype.GetActive = function() {
+  if (this.State == RECTANGLE_WIDGET_WAITING) {
+    return false;  
+  }
+  return true;
+}
+
+// Active simply means that the widget is receiving events.
+// This widget can activate verticies, the whole polyline, or a middle vertex.
+RectangleWidget.prototype.SetActive = function(flag) {  
+  if (flag == this.GetActive()) {
+    return;
+  }
+
+  if (flag) {
+    this.State = RECTANGLE_WIDGET_ACTIVE;  
+    this.Shape.Active = true;
+    if(this.TextShape != false) this.TextShape.Active = true;
+    this.Viewer.ActivateWidget(this);
+    eventuallyRender();
+  } else {
+    this.Deactivate();
+  }
+}
+
 // TODO:
 // make a shape superclass.
 
@@ -7758,8 +8852,7 @@ Shape.prototype.Draw = function (view) {
         view.Context2d.fillStyle=ConvertColorToHex(this.FillColor);
       }
       view.Context2d.fill();
-    }
-    
+    }    
     view.Context2d.restore();
   }
 }
@@ -8969,7 +10062,6 @@ EventManager.prototype.DetectSweepEvent = function(dx,dy) {
           if ((this.LastMouseX-sweep.Location[0])*sweep.Direction[0] +
               (this.LastMouseY-sweep.Location[1])*sweep.Direction[1] < 0.0) {
             this.SelectedSweepListener = sweep;
-            console.log("sweep " + sweep.Label);
           }
         }
       }
@@ -9050,8 +10142,13 @@ EventManager.prototype.HandleTouchStart = function(e) {
 
   this.ChooseViewer();
   if (this.CurrentViewer) {
-    if (this.CurrentViewer.HandleTouchStart(this) && NAVIGATION_WIDGET.Visibility) {
-      NAVIGATION_WIDGET.ToggleVisibility();
+    if (this.CurrentViewer.HandleTouchStart(this)) {
+      if (NAVIGATION_WIDGET.Visibility) {
+        NAVIGATION_WIDGET.ToggleVisibility();
+      }
+      if (MOBILE_ANNOTATION_WIDGET.Visibility) {
+        MOBILE_ANNOTATION_WIDGET.ToggleVisibility();
+      }
     }
   }  
 }
@@ -9061,10 +10158,16 @@ EventManager.prototype.HandleTouchMove = function(e) {
   // Put a throttle on events
   if ( ! this.HandleTouch(e, false)) { return; }
 
-  if (NAVIGATION_WIDGET.Visibility) {
+  if (typeof NAVIGATION_WIDGET != "undefined" &&  NAVIGATION_WIDGET.Visibility) {
     // No slide interaction with the interface up.
     // I had bad interaction with events going to browser.
     NAVIGATION_WIDGET.ToggleVisibility();
+  }
+    
+  if (MOBILE_ANNOTATION_WIDGET.Visibility) {
+    // No slide interaction with the interface up.
+    // I had bad interaction with events going to browser.
+    MOBILE_ANNOTATION_WIDGET.ToggleVisibility();
   }
     
   this.ChooseViewer();  
@@ -9086,7 +10189,6 @@ EventManager.prototype.HandleTouchEnd = function(e) {
   e.preventDefault();
 
   var t = new Date().getTime();
-  console.log("TouchEnd "+t);
   this.LastTime = this.Time;
   this.Time = t;
 
@@ -9095,6 +10197,7 @@ EventManager.prototype.HandleTouchEnd = function(e) {
     this.StartTouchTime = 0;
     if (t < 90) {
       NAVIGATION_WIDGET.ToggleVisibility();
+      MOBILE_ANNOTATION_WIDGET.ToggleVisibility();
       return;
     }
     if (this.CurrentViewer) {
@@ -9104,8 +10207,6 @@ EventManager.prototype.HandleTouchEnd = function(e) {
 }
 
 EventManager.prototype.HandleTouchCancel = function(event) {
-  console.log("touchCancel");
-  this.TouchState = TOUCH_NONE;
   this.MouseDown = false;
 }
 
@@ -9120,13 +10221,13 @@ var EVENT_MANAGER;
 var VIEWER1;
 var VIEWER2;
 var DUAL_VIEW = false;
+var records = [];
+var viewer_click_callback = function(){
+  
+}
 
 var NOTES_WIDGET;
 
-// hack to avoid an undefined error (until we unify annotation stuff).
-function ShowAnnotationEditMenu(x, y) {
-}
-  
   
 function draw() {
   if (GL) {
@@ -9144,12 +10245,121 @@ function draw() {
   }
 }
 
+function selectActiveWidget()
+  {
+  VIEWER1.SetSelectedWidget(getActiveWidget());
+  return getActiveWidget();
+  }
+function unselectActiveWidget()
+  {
+  VIEWER1.SetSelectedWidget(null);
+  }
 
+function getActiveWidget()
+  {
+  return VIEWER1.ActiveWidget;
+  }
 
-function StartVisualizationSession(container, userOptions) {    
+function setWidgetText(widget, text, height)
+  {
+  if(typeof widget.SetText != "undefined")
+    {
+    widget.SetText(text, height);
+    draw();
+    }
+  }
+
+function setActiveWidget(type)
+  {
+  var color = "green";
+  if(typeof VIEWER1.ActiveColor != "undefined")
+    {
+    color = VIEWER1.ActiveColor;
+    }
+  if(type == "circle")
+    {
+    var widget = new CircleWidget(VIEWER1, true);
+    widget.EnableWidgetPopup(false);
+    VIEWER1.ActiveWidget = widget;
+    VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);
+    }
+  else if(type == "rectangle")
+    {
+    var widget = new RectangleWidget(VIEWER1, true);
+    VIEWER1.ActiveWidget = widget;
+    VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);
+    }
+  else if(type == "arrow")
+    {
+    var widget = new ArrowWidget(VIEWER1, true);
+    VIEWER1.ActiveWidget = widget;
+    VIEWER1.ActiveWidget.Shape.SetFillColor(color);
+    }
+  else if(type == "pencil")
+    {
+    var widget = new PencilWidget(VIEWER1, true, false, true);
+    VIEWER1.ActiveWidget = widget;
+    VIEWER1.ActiveWidget.SetOutlineColor(color);
+    }
+  else if(VIEWER1.ActiveWidget != null)
+    {
+    VIEWER1.ActiveWidget.RemoveFromViewer();
+    VIEWER1.ActiveWidget.SetActive(false);
+    }
+  }
+  
+function setDrawnCallback(callback)
+  {
+  if(typeof VIEWER1.ActiveWidget.SetDrawnCallback != "undefined") VIEWER1.ActiveWidget.SetDrawnCallback(callback);
+  }
+  
+function setActiveColor(color)
+  {
+  VIEWER1.ActiveColor = color;
+  if(VIEWER1.ActiveWidget instanceof CircleWidget ||
+    VIEWER1.ActiveWidget instanceof RectangleWidget   )
+    {
+    VIEWER1.ActiveWidget.Shape.OutlineColor = color;
+    if(VIEWER1.ActiveWidget.TextShape != false)
+      {
+      VIEWER1.ActiveWidget.TextShape.Color = VIEWER1.ActiveWidget.Shape.OutlineColor;
+      }
+    }
+  if(VIEWER1.ActiveWidget instanceof ArrowWidget)
+    {
+    VIEWER1.ActiveWidget.Shape.SetFillColor(color);
+    if(VIEWER1.ActiveWidget.TextShape != false)
+      {
+      VIEWER1.ActiveWidget.TextShape.Color = VIEWER1.ActiveWidget.Shape.FillColor;
+      }
+    }
+  if(VIEWER1.ActiveWidget instanceof PencilWidget)
+    {
+    VIEWER1.ActiveWidget.SetOutlineColor(color);
+    if(VIEWER1.ActiveWidget.TextShape != false)
+      {
+      VIEWER1.ActiveWidget.TextShape.Color = VIEWER1.ActiveWidget.OutlineColor;
+      }
+    }
+  }
+
+function getRecord()
+  {  
+  record = new ViewerRecord();
+  record.CopyViewer(VIEWER1);
+  return record;
+  }
+  
+function convertRecordToJson(record)
+  {
+  return geoJson.Io.write(record);
+  }
+
+function startVisualizationSession(container, userOptions) {    
   detectMobile();
   
   var options = {
+
     "center" : [0,0,0],
     "overview_cursor" : 'default',
     "overview_color" : "#4011E5",
@@ -9170,7 +10380,6 @@ function StartVisualizationSession(container, userOptions) {
     "use_notes" : false,
     "use_edit" : false,
     "use_browser" : false,
-    "use_annotation" : false,
     "reverse_mouse_wheel" : false
   };
   
@@ -9216,12 +10425,20 @@ function StartVisualizationSession(container, userOptions) {
                         height - overViewHeight - options.overview_padding,
                         overViewWidth,
                         overViewHeight];
-        
-      VIEWER1.SetViewport([left, 0, width1, height]);
-      VIEWER1.OverView.SetViewport(overViewport);
-      VIEWER1.OverView.Camera.ComputeMatrix();
-      eventuallyRender();
+                      
+      if(typeof VIEWER1.OverView != "undefined")
+        {        
+        VIEWER1.SetViewport([left, 0, width1, height]);
+        VIEWER1.OverView.SetViewport(overViewport);
+        VIEWER1.OverView.Camera.ComputeMatrix();
+        eventuallyRender();
+        }
     }   
+    
+    if(MOBILE_DEVICE !== false)
+      {
+      VIEWER1.OverView.Canvas.hide();
+      }
   };
   
   // Reset Cavas CSS properties
@@ -9233,14 +10450,18 @@ function StartVisualizationSession(container, userOptions) {
   });  
   
   // Trick to fix overview position
-  VIEWER1.OverView.Canvas.css({
-    'cursor': options.overview_cursor
-  });    
+  if(typeof VIEWER1.OverView != "undefined")
+    {
+    VIEWER1.OverView.Canvas.css({
+      'cursor': options.overview_cursor
+    });    
+
+    VIEWER1.OverView.Color = options.overview_color
+    }
   
-  VIEWER1.OverView.Color = options.overview_color
   
   VIEWER1.MainView.Camera.FocalPoint = [options.center[0], options.center[1], 10.0];
-  VIEWER1.MainView.Camera.Height = options.viewHeight;
+  
   
   if(options.use_edit)InitViewEditMenus();
   if(options.use_browser)InitViewBrowser();
@@ -9280,21 +10501,385 @@ function StartVisualizationSession(container, userOptions) {
   }, false);
 
 
-  document.body.addEventListener("mouseup", function(e){
-    EVENT_MANAGER.HandleMouseUp(e);
+  can.addEventListener("mouseup", function(e){   
+    EVENT_MANAGER.HandleMouseUp(e);    
+    viewer_click_callback(e);
   }, false);
-  document.body.addEventListener("touchcancel", function(e){
+  can.addEventListener("touchcancel", function(e){
     EVENT_MANAGER.HandleTouchCancel(e);
   }, false);
 
-  if(options.use_annotation) new AnnotationWidget(VIEWER1, container, imgPath);
-  if(options.use_dual && options.use_annotation) new AnnotationWidget(VIEWER2, container, imgPath);
+  VIEWER1.SetAnnotationVisibility(true);
+
   handleResize();
   if(options.use_dual) DualViewUpdateGui();
   
   if(typeof options.bounds == "undefined") options.bounds = [0, options.dimensions[0], 0, options.dimensions[1]];
  
   LoadImage(VIEWER1, options);
+  
+  var canvasRatio = CANVAS.innerWidth()/CANVAS.innerHeight();
+  var left = 0;
+  var bds = VIEWER1.GetCache().GetBounds();
+  var heightCamera = (bds[3]-bds[2]);
+  var widthCamera = ((bds[1]-bds[0])/canvasRatio);
+
+  if(bds[3]-bds[2] > bds[1]-bds[0] || heightCamera > widthCamera)VIEWER1.MainView.Camera.Height = heightCamera;
+  else VIEWER1.MainView.Camera.Height = widthCamera;
+  
+  VIEWER1.ZoomTarget = VIEWER1.MainView.Camera.Height;
+  VIEWER1.MainView.Camera.ComputeMatrix();
+  draw();  
+  
   eventuallyRender();
 }
 
+/* Copyright (c) 2006-2013 by OpenLayers Contributors (see authors.txt for
+ * full list of contributors). Published under the 2-clause BSD license.
+ * See license.txt in the OpenLayers distribution or repository for the
+ * full text of the license. */
+
+var geoJson = geoJson || {};
+geoJson.Io =  geoJson.Io || {};
+
+if(typeof console == "undefined")
+  {
+  console = {};
+  console.log = function(){};
+  }
+/**
+* APIMethod: read
+* Deserialize a GeoJSON string.
+*
+* Parameters:
+* json - {String} A GeoJSON string
+* type - {String} Optional string that determines the structure of
+*     the output.  Supported values are "Geometry", "Feature", and
+*     "FeatureCollection".  If absent or null, a default of
+*     "FeatureCollection" is assumed.
+* filter - {Function} A function which will be called for every key and
+*     value at every level of the final result. Each value will be
+*     replaced by the result of the filter function. This can be used to
+*     reform generic objects into instances of classes, or to transform
+*     date strings into Date objects.
+*
+* Returns: 
+* {Object} The return depends on the value of the type argument. If type
+*     is "FeatureCollection" (the default), the return will be an array
+*     of <OpenLayers.Feature.Vector>. If type is "Geometry", the input json
+*     must represent a single geometry, and the return will be an
+*     <OpenLayers.Geometry>.  If type is "Feature", the input json must
+*     represent a single feature, and the return will be an
+*     <OpenLayers.Feature.Vector>.
+*/
+geoJson.Io.read = function(json)
+  {
+  var obj = jQuery.parseJSON(json);
+ 
+  if(obj == null || obj.type != "FeatureCollection") 
+    {
+    console.log("Bad JSON: " + json);
+    return;
+    } 
+    
+  $.each(obj.features, function(i, feature)
+    {
+    geoJson.Io.createObj[feature.geometry.type].apply(
+          this, [feature]
+          );
+    if(typeof feature.properties.text != "undefined")
+      {
+      var widget = VIEWER1.WidgetList[VIEWER1.WidgetList.length-1];
+      if(typeof widget.SetText != "undefined")
+        {
+        widget.SetText(feature.properties.text,12);
+        }
+      }
+    })      
+  }
+
+
+
+geoJson.Io.createObj = {
+
+  "point": function(array) {
+    // Todo Create point
+    //array[0], array[1]
+  },
+  
+  "circle": function(feature) {
+    var obj = {}
+    obj.type = "circle";
+    obj.origin = feature.geometry.coordinates[0];
+    obj.radius = feature.geometry.coordinates[1];
+    obj.outlinecolor = feature.properties.outlinecolor;
+    obj.linewidth = feature.properties.linewidth;
+    VIEWER1.LoadWidget(obj);
+  },
+  
+  "rectangle": function(feature) {
+    var obj = {}
+    obj.type = "rectangle";
+    obj.points = feature.geometry.coordinates;
+    obj.outlinecolor = feature.properties.outlinecolor;
+    obj.linewidth = feature.properties.linewidth;
+    VIEWER1.LoadWidget(obj);
+  },
+  
+  "arrow": function(feature) {
+    var obj = {}
+    obj.type = "arrow";
+    obj.origin = feature.geometry.coordinates.origin;
+    obj.fillcolor = feature.geometry.coordinates.fillcolor;
+    obj.length = feature.geometry.coordinates.length;
+    obj.width = feature.geometry.coordinates.width;
+    obj.orientation = feature.geometry.coordinates.orientation;
+    obj.fixedsize = ""+feature.geometry.coordinates.fixedsize;
+    obj.fixedorientation = ""+feature.geometry.coordinates.fixedorientation;
+    obj.outlinecolor = feature.properties.outlinecolor;
+    obj.linewidth = feature.properties.linewidth;
+    VIEWER1.LoadWidget(obj);
+  },
+
+  "multipoint": function(array) {
+    var points = [];
+    var p = null;
+    for(var i=0, len=array.length; i<len; ++i) {
+      try {
+        p = this.parseCoords["point"].apply(this, [array[i]]);
+      } catch(err) {
+        throw err;
+      }
+      points.push(p);
+    }   
+  },
+
+
+  "linestring": function(array) {
+    var points = [];
+    var p = null;
+    for(var i=0, len=array.length; i<len; ++i) {
+      try {
+        p = this.parseCoords["point"].apply(this, [array[i]]);
+      } catch(err) {
+        throw err;
+      }
+      points.push(p);
+    }
+    // Todo Create line
+  },
+                
+  "polygon": function(array) {
+    var rings = [];
+    var r, l;
+    for(var i=0, len=array.length; i<len; ++i) {
+      try {
+        l = this.parseCoords["linestring"].apply(this, [array[i]]);
+      } catch(err) {
+        throw err;
+      }
+     // r = new OpenLayers.Geometry.LinearRing(l.components);
+     // rings.push(r);
+    }
+     // Todo Create 
+  },
+
+
+  "box": function(array) {
+    if(array.length != 2) {
+      throw "GeoJSON box coordinates must have 2 elements";
+    }
+         // Todo Create 
+  /*  return new OpenLayers.Geometry.Polygon([
+      new OpenLayers.Geometry.LinearRing([
+        new OpenLayers.Geometry.Point(array[0][0], array[0][1]),
+        new OpenLayers.Geometry.Point(array[1][0], array[0][1]),
+        new OpenLayers.Geometry.Point(array[1][0], array[1][1]),
+        new OpenLayers.Geometry.Point(array[0][0], array[1][1]),
+        new OpenLayers.Geometry.Point(array[0][0], array[0][1])
+        ])
+      ]);*/
+  }
+
+},
+
+/**
+ * APIMethod: write
+ * Serialize a feature, geometry, array of features into a GeoJSON string.
+ *
+ * Parameters:
+ * obj - {Object} An <OpenLayers.Feature.Vector>, <OpenLayers.Geometry>,
+ *     or an array of features.
+ * pretty - {Boolean} Structure the output with newlines and indentation.
+ *     Default is false.
+ *
+ * Returns:
+ * {String} The GeoJSON string representation of the input geometry,
+ *     features, or array of features.
+ */
+geoJson.Io.write = function(obj) {
+  var geojson = {
+    "type": null
+  };
+  // Todo
+  geojson.type = "FeatureCollection";
+  var numFeatures = obj.Annotations.length;
+  geojson.features = new Array(numFeatures);
+  for(var i=0; i<numFeatures; ++i) {
+    var element = obj.Annotations[i];
+    geojson.features[i] = this.extract.feature.apply(
+      this, [element]
+      );
+    if(typeof element.text != "undefined" 
+        && element.text != "")
+      {
+      geojson.features[i].properties['text'] = element.text;
+      }
+  }
+  return JSON.stringify(geojson);
+}
+
+/**
+     * Property: extract
+     * Object with properties corresponding to the GeoJSON types.
+     *     Property values are functions that do the actual value extraction.
+     */
+geoJson.Io.extract ={
+  /**
+         * Method: extract.feature
+         * Return a partial GeoJSON object representing a single feature.
+         *
+         * Parameters:
+         * feature - {<OpenLayers.Feature.Vector>}
+         *
+         * Returns:
+         * {Object} An object representing the point.
+         */
+  'feature': function(feature) {
+    var geom = this.extract.geometry.apply(this, [feature]);
+    var json = {
+      "type": "Feature",
+      "properties": {linewidth:feature.linewidth , outlinecolor:feature.outlinecolor},
+      "geometry": geom
+    };
+    if (feature.fid != null) {
+      json.id = feature.fid;
+    }
+    return json;
+  },
+        
+  /**
+         * Method: extract.geometry
+         * Return a GeoJSON object representing a single geometry.
+         *
+         * Parameters:
+         * geometry - {<OpenLayers.Geometry>}
+         *
+         * Returns:
+         * {Object} An object representing the geometry.
+         */
+  'geometry': function(geometry) {
+    if (geometry == null) {
+      return null;
+    }
+                    
+    var geometryType = geometry.type;
+    var data = this.extract[geometryType.toLowerCase()].apply(this, [geometry]);
+    var json;
+    if(geometryType == "Collection") {
+      json = {
+        "type": "GeometryCollection",
+        "geometries": data
+      };
+    } else {
+      json = {
+        "type": geometryType,
+        "coordinates": data
+      };
+    }
+            
+    return json;
+  },
+  
+
+  'point': function(point) {
+    return [point.x, point.y];
+  },
+
+ 
+  'circle': function(circle) {
+    return [circle.origin, circle.radius];
+  },
+  
+  'rectangle': function(rectangle) {
+    return rectangle.points;
+  },
+  
+  'arrow': function(arrow) {
+    return {origin:arrow.origin,  fillcolor: arrow.fillcolor,
+      length:arrow.length,
+      width:arrow.width,
+      orientation:arrow.orientation,
+      fixedsize:arrow.fixedsize,
+      fixedorientation:arrow.fixedorientation
+    };
+  },
+ 
+  'multipoint': function(multipoint) {
+    var array = [];
+    for(var i=0, len=multipoint.components.length; i<len; ++i) {
+      array.push(this.extract.point.apply(this, [multipoint.components[i]]));
+    }
+    return array;
+  },
+        
+ 
+  'linestring': function(linestring) {
+    var array = [];
+    for(var i=0, len=linestring.components.length; i<len; ++i) {
+      array.push(this.extract.point.apply(this, [linestring.components[i]]));
+    }
+    return array;
+  },
+
+ 
+  'multilinestring': function(multilinestring) {
+    var array = [];
+    for(var i=0, len=multilinestring.components.length; i<len; ++i) {
+      array.push(this.extract.linestring.apply(this, [multilinestring.components[i]]));
+    }
+    return array;
+  },
+        
+ 
+  'polygon': function(polygon) {
+    var array = [];
+    for(var i=0, len=polygon.components.length; i<len; ++i) {
+      array.push(this.extract.linestring.apply(this, [polygon.components[i]]));
+    }
+    return array;
+  },
+
+  'multipolygon': function(multipolygon) {
+    var array = [];
+    for(var i=0, len=multipolygon.components.length; i<len; ++i) {
+      array.push(this.extract.polygon.apply(this, [multipolygon.components[i]]));
+    }
+    return array;
+  },
+        
+ 
+  'collection': function(collection) {
+    var len = collection.components.length;
+    var array = new Array(len);
+    for(var i=0; i<len; ++i) {
+      array[i] = this.extract.geometry.apply(
+        this, [collection.components[i]]
+        );
+    }
+    return array;
+  }
+        
+
+}
+    

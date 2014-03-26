@@ -3,13 +3,13 @@ var EVENT_MANAGER;
 var VIEWER1;
 var VIEWER2;
 var DUAL_VIEW = false;
+var records = [];
+var viewer_click_callback = function(){
+  
+}
 
 var NOTES_WIDGET;
 
-// hack to avoid an undefined error (until we unify annotation stuff).
-function ShowAnnotationEditMenu(x, y) {
-}
-  
   
 function draw() {
   if (GL) {
@@ -27,12 +27,121 @@ function draw() {
   }
 }
 
+function selectActiveWidget()
+  {
+  VIEWER1.SetSelectedWidget(getActiveWidget());
+  return getActiveWidget();
+  }
+function unselectActiveWidget()
+  {
+  VIEWER1.SetSelectedWidget(null);
+  }
 
+function getActiveWidget()
+  {
+  return VIEWER1.ActiveWidget;
+  }
 
-function StartVisualizationSession(container, userOptions) {    
+function setWidgetText(widget, text, height)
+  {
+  if(typeof widget.SetText != "undefined")
+    {
+    widget.SetText(text, height);
+    draw();
+    }
+  }
+
+function setActiveWidget(type)
+  {
+  var color = "green";
+  if(typeof VIEWER1.ActiveColor != "undefined")
+    {
+    color = VIEWER1.ActiveColor;
+    }
+  if(type == "circle")
+    {
+    var widget = new CircleWidget(VIEWER1, true);
+    widget.EnableWidgetPopup(false);
+    VIEWER1.ActiveWidget = widget;
+    VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);
+    }
+  else if(type == "rectangle")
+    {
+    var widget = new RectangleWidget(VIEWER1, true);
+    VIEWER1.ActiveWidget = widget;
+    VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);
+    }
+  else if(type == "arrow")
+    {
+    var widget = new ArrowWidget(VIEWER1, true);
+    VIEWER1.ActiveWidget = widget;
+    VIEWER1.ActiveWidget.Shape.SetFillColor(color);
+    }
+  else if(type == "pencil")
+    {
+    var widget = new PencilWidget(VIEWER1, true, false, true);
+    VIEWER1.ActiveWidget = widget;
+    VIEWER1.ActiveWidget.SetOutlineColor(color);
+    }
+  else if(VIEWER1.ActiveWidget != null)
+    {
+    VIEWER1.ActiveWidget.RemoveFromViewer();
+    VIEWER1.ActiveWidget.SetActive(false);
+    }
+  }
+  
+function setDrawnCallback(callback)
+  {
+  if(typeof VIEWER1.ActiveWidget.SetDrawnCallback != "undefined") VIEWER1.ActiveWidget.SetDrawnCallback(callback);
+  }
+  
+function setActiveColor(color)
+  {
+  VIEWER1.ActiveColor = color;
+  if(VIEWER1.ActiveWidget instanceof CircleWidget ||
+    VIEWER1.ActiveWidget instanceof RectangleWidget   )
+    {
+    VIEWER1.ActiveWidget.Shape.OutlineColor = color;
+    if(VIEWER1.ActiveWidget.TextShape != false)
+      {
+      VIEWER1.ActiveWidget.TextShape.Color = VIEWER1.ActiveWidget.Shape.OutlineColor;
+      }
+    }
+  if(VIEWER1.ActiveWidget instanceof ArrowWidget)
+    {
+    VIEWER1.ActiveWidget.Shape.SetFillColor(color);
+    if(VIEWER1.ActiveWidget.TextShape != false)
+      {
+      VIEWER1.ActiveWidget.TextShape.Color = VIEWER1.ActiveWidget.Shape.FillColor;
+      }
+    }
+  if(VIEWER1.ActiveWidget instanceof PencilWidget)
+    {
+    VIEWER1.ActiveWidget.SetOutlineColor(color);
+    if(VIEWER1.ActiveWidget.TextShape != false)
+      {
+      VIEWER1.ActiveWidget.TextShape.Color = VIEWER1.ActiveWidget.OutlineColor;
+      }
+    }
+  }
+
+function getRecord()
+  {  
+  record = new ViewerRecord();
+  record.CopyViewer(VIEWER1);
+  return record;
+  }
+  
+function convertRecordToJson(record)
+  {
+  return geoJson.Io.write(record);
+  }
+
+function startVisualizationSession(container, userOptions) {    
   detectMobile();
   
   var options = {
+
     "center" : [0,0,0],
     "overview_cursor" : 'default',
     "overview_color" : "#4011E5",
@@ -53,7 +162,6 @@ function StartVisualizationSession(container, userOptions) {
     "use_notes" : false,
     "use_edit" : false,
     "use_browser" : false,
-    "use_annotation" : false,
     "reverse_mouse_wheel" : false
   };
   
@@ -99,12 +207,20 @@ function StartVisualizationSession(container, userOptions) {
                         height - overViewHeight - options.overview_padding,
                         overViewWidth,
                         overViewHeight];
-        
-      VIEWER1.SetViewport([left, 0, width1, height]);
-      VIEWER1.OverView.SetViewport(overViewport);
-      VIEWER1.OverView.Camera.ComputeMatrix();
-      eventuallyRender();
+                      
+      if(typeof VIEWER1.OverView != "undefined")
+        {        
+        VIEWER1.SetViewport([left, 0, width1, height]);
+        VIEWER1.OverView.SetViewport(overViewport);
+        VIEWER1.OverView.Camera.ComputeMatrix();
+        eventuallyRender();
+        }
     }   
+    
+    if(MOBILE_DEVICE !== false)
+      {
+      VIEWER1.OverView.Canvas.hide();
+      }
   };
   
   // Reset Cavas CSS properties
@@ -116,14 +232,18 @@ function StartVisualizationSession(container, userOptions) {
   });  
   
   // Trick to fix overview position
-  VIEWER1.OverView.Canvas.css({
-    'cursor': options.overview_cursor
-  });    
+  if(typeof VIEWER1.OverView != "undefined")
+    {
+    VIEWER1.OverView.Canvas.css({
+      'cursor': options.overview_cursor
+    });    
+
+    VIEWER1.OverView.Color = options.overview_color
+    }
   
-  VIEWER1.OverView.Color = options.overview_color
   
   VIEWER1.MainView.Camera.FocalPoint = [options.center[0], options.center[1], 10.0];
-  VIEWER1.MainView.Camera.Height = options.viewHeight;
+  
   
   if(options.use_edit)InitViewEditMenus();
   if(options.use_browser)InitViewBrowser();
@@ -163,21 +283,36 @@ function StartVisualizationSession(container, userOptions) {
   }, false);
 
 
-  document.body.addEventListener("mouseup", function(e){
-    EVENT_MANAGER.HandleMouseUp(e);
+  can.addEventListener("mouseup", function(e){   
+    EVENT_MANAGER.HandleMouseUp(e);    
+    viewer_click_callback(e);
   }, false);
-  document.body.addEventListener("touchcancel", function(e){
+  can.addEventListener("touchcancel", function(e){
     EVENT_MANAGER.HandleTouchCancel(e);
   }, false);
 
-  if(options.use_annotation) new AnnotationWidget(VIEWER1, container, imgPath);
-  if(options.use_dual && options.use_annotation) new AnnotationWidget(VIEWER2, container, imgPath);
+  VIEWER1.SetAnnotationVisibility(true);
+
   handleResize();
   if(options.use_dual) DualViewUpdateGui();
   
   if(typeof options.bounds == "undefined") options.bounds = [0, options.dimensions[0], 0, options.dimensions[1]];
  
   LoadImage(VIEWER1, options);
+  
+  var canvasRatio = CANVAS.innerWidth()/CANVAS.innerHeight();
+  var left = 0;
+  var bds = VIEWER1.GetCache().GetBounds();
+  var heightCamera = (bds[3]-bds[2]);
+  var widthCamera = ((bds[1]-bds[0])/canvasRatio);
+
+  if(bds[3]-bds[2] > bds[1]-bds[0] || heightCamera > widthCamera)VIEWER1.MainView.Camera.Height = heightCamera;
+  else VIEWER1.MainView.Camera.Height = widthCamera;
+  
+  VIEWER1.ZoomTarget = VIEWER1.MainView.Camera.Height;
+  VIEWER1.MainView.Camera.ComputeMatrix();
+  draw();  
+  
   eventuallyRender();
 }
 

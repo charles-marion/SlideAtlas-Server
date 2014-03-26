@@ -15,26 +15,36 @@
 
 
 
-function PencilWidget (viewer, newFlag) {
+function PencilWidget (viewer, newFlag, showIcon, oneLineOnly) {
   if (viewer == null) {
     return;
   }
+  if(typeof showIcon == "undefined") showIcon = true;
+  if(typeof oneLineOnly == "undefined") oneLineOnly = false;
   this.Viewer = viewer;    
   this.Viewer.WidgetList.push(this);
-
+  this.OutlineColor = [0.9, 1.0, 0.0];
+  this.TextShape = false;
+  this.OneLineOnly = oneLineOnly; // It means the widget is disable when mouse up
+  this.DrawnCallback = function(widget){};
+  
   this.Cursor = $('<img>').appendTo('body')
-      .css({
-        'position': 'absolute',
-        'height': '28px',
-        'z-index': '1'})
-      .attr('type','image')
-      .attr('src',"webgl-viewer/static/Pencil-icon.png");  
-
+    .css({
+      'position': 'absolute',
+      'height': '28px',
+      'z-index': '1'})
+    .attr('type','image')
+    .attr('src',"webgl-viewer/static/Pencil-icon.png");  
   this.Shapes = [];
   
-  if ( ! newFlag) {
+  if ( ! newFlag || !showIcon) {
       this.Cursor.hide();
   }
+  
+  if(newFlag)
+    {
+    this.Viewer.SetCursor("crosshair");
+    }
 }
 
 
@@ -57,16 +67,28 @@ PencilWidget.prototype.Serialize = function() {
     } 
     obj.shapes.push(points);
   }
-
   return obj;
 }
+
+PencilWidget.prototype.SetOutlineColor = function(c) {
+  this.OutlineColor = ConvertColor(c);
+  this.ApplyColor(this.OutlineColor);
+}
+
+PencilWidget.prototype.ApplyColor = function(color) {
+  for (var i = 0; i < this.Shapes.length; ++i) 
+    {
+    this.Shapes[i].OutlineColor = color;    
+    }
+}
+
 
 // Load a widget from a json object (origin MongoDB).
 PencilWidget.prototype.Load = function(obj) {
   for(var n=0; n < obj.shapes.length; n++){
     var points = obj.shapes[n];
     var shape = new Polyline();
-    shape.OutlineColor = [0.9, 1.0, 0.0];
+    shape.OutlineColor = this.OutlineColor
     shape.FixedSize = false;
     shape.LineWidth = 0;
     this.Shapes.push(shape);
@@ -103,6 +125,10 @@ PencilWidget.prototype.HandleMouseDown = function(event) {
   }
 }
 
+PencilWidget.prototype.SetDrawnCallback = function(callback) {
+    this.DrawnCallback = callback;
+}
+
 PencilWidget.prototype.HandleMouseUp = function(event) {
   if (event.SystemEvent.which == 3) {
     // Right mouse was pressed.
@@ -113,6 +139,7 @@ PencilWidget.prototype.HandleMouseUp = function(event) {
   if (event.SystemEvent.which == 2) {
     // Middle mouse was pressed.
     this.Deactivate();
+    this.DrawnCallback(this);
   }
 
   // A stroke has just been finished.
@@ -120,6 +147,11 @@ PencilWidget.prototype.HandleMouseUp = function(event) {
     var spacing = this.Viewer.GetSpacing();
     this.Decimate(this.Shapes[this.Shapes.length - 1], spacing);
     RecordState();
+  }
+  
+  if(this.OneLineOnly){
+    this.Deactivate();
+    this.DrawnCallback(this);
   }
 }
 

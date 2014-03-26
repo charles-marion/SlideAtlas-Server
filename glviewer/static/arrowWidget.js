@@ -25,6 +25,7 @@ function ArrowWidget (viewer, newFlag) {
     return null;
   }
   this.Viewer = viewer;
+  this.IsTextActive = false;
 
   // Wait to create this until the first move event.
   this.Shape = new Arrow();
@@ -33,6 +34,12 @@ function ArrowWidget (viewer, newFlag) {
   this.Shape.OutlineColor = [1.0, 1.0, 1.0];
   this.Shape.Length = 50;
   this.Shape.Width = 8;
+  
+  this.IsShapeUpdate = false;
+  
+  this.TextShape = false;
+  this.DrawnCallback = function(widget){};
+  
   // Note: If the user clicks before the mouse is in the
   // canvas, this will behave odd.
   this.TipPosition = [0,0];
@@ -52,6 +59,55 @@ function ArrowWidget (viewer, newFlag) {
 
 ArrowWidget.prototype.Draw = function(view) {
     this.Shape.Draw(view);
+    if(this.TextShape != false && this.TextShape.String != "")
+      {
+      this.UpdatetTextPosition();
+      this.TextShape.Draw(view);  
+      }
+    else if(this.Viewer.AnnotationEditable)
+      {
+      this.SetText("Add Label", 12)
+      this.TextShape.Color =  [0.6, 0.6, 0.6];
+      this.UpdatetTextPosition(view);
+      this.TextShape.Draw(view);
+      this.TextShape = false;
+      }
+}
+
+ArrowWidget.prototype.UpdatetTextPosition = function(view) {
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    this.TextShape.Position= this.Shape.Origin; 
+    var theta = this.Shape.Orientation * 3.1415926536 / 180.0;
+    var y = Math.sin( theta) * (this.Shape.PointBuffer[9]+4);
+    var x = Math.cos( theta) * (this.Shape.PointBuffer[9]+4);    
+    if(y < 0) y -= 5
+    this.TextShape.Anchor = [-x,-y];
+    }
+}
+
+ArrowWidget.prototype.GetSelectBounds = function() {
+  var theta = this.Shape.Orientation * 3.1415926536 / 180.0;
+  var y = Math.sin( theta) * (this.Shape.PointBuffer[9]);
+  var x = Math.cos( theta) * (this.Shape.PointBuffer[9]);    
+  x = this.Shape.Origin[0] + x/this.Viewer.GetPixelsPerUnit();
+  y = this.Shape.Origin[1] + y/this.Viewer.GetPixelsPerUnit();
+  var pt1 = [this.Shape.Origin[0], this.Shape.Origin[1]];
+  var pt2 = [x, y];
+  return [pt1,pt2];
+}
+
+ArrowWidget.prototype.SetDrawnCallback = function(callback) {
+    this.DrawnCallback = callback;
+}
+
+ArrowWidget.prototype.SetText = function(text, height) {
+  this.TextShape = new Text();
+  this.TextShape.String = text;  
+  this.TextShape.Size = height;  
+  this.TextShape.Color = this.Shape.FillColor;
+  this.TextShape.Position= this.Shape.Origin; 
+  this.TextShape.UpdateBuffers(); 
 }
 
 
@@ -80,6 +136,12 @@ ArrowWidget.prototype.Serialize = function() {
   obj.orientation = this.Shape.Orientation;
   obj.fixedsize = this.Shape.FixedSize;
   obj.fixedorientation = this.Shape.FixedOrientation;
+  
+  obj.test = "";
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    obj.text = this.TextShape.String;
+    }
 
   return obj;
 }
@@ -104,7 +166,6 @@ ArrowWidget.prototype.Load = function(obj) {
   } else {
     this.Shape.FixedOrientation = (obj.fixedorientation == "true");
   }
-
   this.Shape.UpdateBuffers();
 }
 
@@ -166,6 +227,9 @@ ArrowWidget.prototype.HandleMouseUp = function(event) {
     this.State = ARROW_WIDGET_PROPERTIES_DIALOG;
     this.ShowPropertiesDialog();
   } else if (this.State != ARROW_WIDGET_PROPERTIES_DIALOG) {
+    this.DrawnCallback(this);
+    if(this.IsShapeUpdate)this.Viewer.UpdateCallback(this);
+    this.IsShapeUpdate = false;
     this.SetActive(false);
   }
 }
@@ -183,6 +247,7 @@ ArrowWidget.prototype.HandleMouseMove = function(event) {
     var viewport = this.Viewer.GetViewport();    
     this.Shape.Origin = this.Viewer.ConvertPointViewerToWorld(x+this.TipOffset[0], y+this.TipOffset[1]);
     eventuallyRender();
+    this.IsShapeUpdate = true;
   }
 
   if (this.State == ARROW_WIDGET_DRAG_TAIL) { 
@@ -197,6 +262,7 @@ ArrowWidget.prototype.HandleMouseMove = function(event) {
     this.Shape.Orientation = Math.atan2(dy, dx) * 180.0 / Math.PI;
     this.Shape.UpdateBuffers();
     eventuallyRender();
+    this.IsShapeUpdate = true;
   }
 
   if (this.State == ARROW_WIDGET_WAITING) { 
@@ -236,16 +302,64 @@ ArrowWidget.prototype.CheckActive = function(event) {
     length *= pixelsPerUnit;
     halfWidth *= pixelsPerUnit;
   }
+  
+  this.IsTextActive = false;
+  
+  var textOriginScreenPixelPosition;
+  var tMouseX = null;
+  var tMouseY = null;
+  
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    textOriginScreenPixelPosition = this.Viewer.ConvertPointWorldToViewer(this.TextShape.Position[0],this.TextShape.Position[1]);
+    
+    tMouseX = (event.MouseX - textOriginScreenPixelPosition[0]) + this.TextShape.Anchor[0];  
+    tMouseY = (event.MouseY - textOriginScreenPixelPosition[1]) + this.TextShape.Anchor[1];  
+   
+    if (tMouseX > this.TextShape.PixelBounds[0] && tMouseX < this.TextShape.PixelBounds[1] &&
+      tMouseY > this.TextShape.PixelBounds[2] && tMouseY < this.TextShape.PixelBounds[3])
+      {
+      this.SetActive(true);
+      this.IsTextActive = true;
+      this.Viewer.SetCursor("text");
+      return true;
+      }
+    }
+  else if(this.Viewer.AnnotationEditable)
+    {      
+    var theta = this.Shape.Orientation * 3.1415926536 / 180.0;
+    var yAnchor = Math.sin( theta) * (this.Shape.PointBuffer[9]+4);
+    var xAnchor  = Math.cos( theta) * (this.Shape.PointBuffer[9]+4);    
+    if(yAnchor < 0) yAnchor -= 5
+    textOriginScreenPixelPosition = this.Viewer.ConvertPointWorldToViewer(this.Shape.Origin[0], this.Shape.Origin[1]);
+    tMouseX = (event.MouseX - textOriginScreenPixelPosition[0]  - xAnchor );  
+    tMouseY = (event.MouseY - textOriginScreenPixelPosition[1] - yAnchor  - 6);  
+    if(tMouseX > 0 && tMouseX < 70 && Math.abs(tMouseY) < 6)   
+      {
+      this.SetActive(true);
+      this.IsTextActive = true;
+      this.Viewer.SetCursor("text");
+      return true;
+      }
+    }
+  
 
   this.ActiveTail = false;
   if (xNew > 0.0 && xNew < length && yNew > -halfWidth && yNew < halfWidth) {
     this.SetActive(true);
     // Save the position along the arrow to decide which drag behavior to use.
-    if (xNew > length - halfWidth) {
+    if (xNew > length - halfWidth*4) 
+      {
       this.ActiveTail = true;
-    }
+      this.Viewer.SetCursor("col-resize");
+      }
+    else
+      {
+      this.Viewer.SetCursor("move");
+      }
     return true;
   } else {
+    this.Viewer.SetCursor("move");
     this.SetActive(false);
     return false;
   }
@@ -270,11 +384,13 @@ ArrowWidget.prototype.SetActive = function(flag) {
   if (flag) {
     this.State = ARROW_WIDGET_ACTIVE;  
     this.Shape.Active = true;
+    if(this.TextShape != false) this.TextShape.Active = true;
     this.Viewer.ActivateWidget(this);
     eventuallyRender();
   } else {
     this.State = ARROW_WIDGET_WAITING;
     this.Shape.Active = false;
+    if(this.TextShape != false) this.TextShape.Active = false;
     this.Viewer.DeactivateWidget(this);
     eventuallyRender();
   }

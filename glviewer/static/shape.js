@@ -193,8 +193,7 @@ Shape.prototype.Draw = function (view) {
         view.Context2d.fillStyle=ConvertColorToHex(this.FillColor);
       }
       view.Context2d.fill();
-    }
-    
+    }    
     view.Context2d.restore();
   }
 }

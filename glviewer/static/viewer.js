@@ -17,6 +17,9 @@ function Viewer (viewport, cache) {
   // Some of these could get transitioned to view or style ...
   // Left click option: Drag in main window, place in overview.
   this.OverViewEventFlag = false;
+  
+  this.EnableCursorChange = false;
+  this.CurrentCursor = "default";
 
   // Interaction state:
   // What to do for mouse move or mouse up.
@@ -28,6 +31,7 @@ function Viewer (viewport, cache) {
   this.AnimateLast;
   this.AnimateDuration = 0.0;
   this.TranslateTarget = [0.0,0.0];
+  this.UpdateCallback = function(){};
   
   this.MainView = new View(viewport, 1);
   this.MainView.OutlineColor = [0,0,0];
@@ -48,14 +52,37 @@ function Viewer (viewport, cache) {
   this.RollTarget = this.MainView.Camera.Roll;
 
   this.AnnotationVisibility = ANNOTATION_OFF;
+  this.AnnotationEditable = true;
   this.ShapeList = [];
   this.WidgetList = [];
   this.ActiveWidget = null;
+  this.SelectedWidget = null;
 
   this.DoubleClickX = 0; 
   this.DoubleClickY = 0;
 
   this.GuiElements = [];
+}
+
+Viewer.prototype.SetCursorChange = function(v)
+{
+  this.EnableCursorChange = v;
+}
+
+Viewer.prototype.SetUpdateCallback = function(callback)
+{
+  this.UpdateCallback = callback;
+}
+
+// Canvas support only
+Viewer.prototype.SetCursor = function(cssvalue)
+{
+  if(!this.EnableCursorChange)return;
+  if(!GL && this.CurrentCursor != cssvalue)
+    {
+    this.MainView.Canvas.css('cursor', cssvalue);
+    }
+  this.CurrentCursor = cssvalue;
 }
 
 Viewer.prototype.GetAnnotationVisibility = function() {
@@ -64,6 +91,14 @@ Viewer.prototype.GetAnnotationVisibility = function() {
   
 Viewer.prototype.SetAnnotationVisibility = function(vis) {
   this.AnnotationVisibility = vis;
+}  
+
+Viewer.prototype.GetAnnotationEditable = function() {
+  return this.AnnotationEditable;
+}
+  
+Viewer.prototype.SetAnnotationEditable = function(vis) {
+  this.AnnotationEditable = vis;
 }  
 
 
@@ -401,6 +436,10 @@ Viewer.prototype.LoadWidget = function(obj) {
       var pl = new PolylineWidget(this, false);
       pl.Load(obj);
       break;
+    case "rectangle":    
+      var rectangle = new RectangleWidget(this, false);
+      rectangle.Load(obj);
+      break;
   }
 }
 
@@ -424,7 +463,9 @@ Viewer.prototype.DeactivateWidget = function(widget) {
   this.ActiveWidget = null;
 }
 
-
+Viewer.prototype.SetSelectedWidget = function(widget) {
+  this.SelectedWidget = widget;
+}
 
 Viewer.prototype.DegToRad = function(degrees) {
   return degrees * Math.PI / 180;
@@ -462,6 +503,30 @@ Viewer.prototype.Draw = function() {
     for(i in this.WidgetList){
       this.WidgetList[i].Draw(this.MainView, this.AnnotationVisibility);
     }
+
+    
+    if(this.SelectedWidget != null)
+      {
+      if(typeof this.SelectedWidget.GetSelectBounds != 'undefined')
+        {
+        var bounds = this.SelectedWidget.GetSelectBounds();
+        var rectangle = new Polyline();
+        
+        var mainpt = [bounds[0][0] + 10, bounds[0][1] +10];
+        var pt = [bounds[1][0] + 10, bounds[1][1] +10];
+        rectangle.OutlineColor = [0.6, 0.6, 0.6];
+        rectangle.FixedSize = false;
+        rectangle.Points = [];
+        rectangle.Points.push(mainpt);
+        rectangle.Points.push([pt[0], mainpt[1]]);
+        rectangle.Points.push([pt[0], pt[1]]);
+        rectangle.Points.push([mainpt[0], pt[1]]);
+        rectangle.Points.push(mainpt);   
+        rectangle.Points.push([pt[0], mainpt[1]]);     
+        rectangle.UpdateBuffers();
+        rectangle.Draw(this.MainView)
+        }
+      }
   }
 
     // Draw a rectangle in the overview representing the camera's view.
@@ -577,7 +642,7 @@ Viewer.prototype.HandleTouchStart = function(event) {
   }
   
   // See if any widget became active.
-  if (this.AnnotationVisibility) {
+  if (this.AnnotationVisibility && this.AnnotationEditable) {
     for (var touchIdx = 0; touchIdx < event.Touches.length; ++touchIdx) {
       event.MouseX = event.Touches[touchIdx][0];
       event.MouseY = event.Touches[touchIdx][1];
@@ -590,8 +655,7 @@ Viewer.prototype.HandleTouchStart = function(event) {
         }
       }
     }
-  }
-    
+  }    
   return false;
 }
 
@@ -952,6 +1016,8 @@ Viewer.prototype.HandleDoubleClick = function(event) {
 }
 
 Viewer.prototype.HandleMouseUp = function(event) {
+
+   this.ComputeMouseWorld(event);
   // Forward the events to the widget if one is active.
   if (this.ActiveWidget != null) {
     this.ActiveWidget.HandleMouseUp(event);
@@ -993,7 +1059,6 @@ Viewer.prototype.ComputeMouseWorld = function(event) {
 
 Viewer.prototype.HandleMouseMove = function(event) {
   this.ComputeMouseWorld(event);
-    
   // Forward the events to the widget if one is active.
   if (this.ActiveWidget != null) {
     this.ActiveWidget.HandleMouseMove(event);
@@ -1001,7 +1066,7 @@ Viewer.prototype.HandleMouseMove = function(event) {
   }
   
   // See if any widget became active.
-  if (this.AnnotationVisibility) {
+  if (this.AnnotationVisibility && this.AnnotationEditable) {
     for (var i = 0; i < this.WidgetList.length; ++i) {
       if (this.WidgetList[i].CheckActive(event)) {
         this.ActivateWidget(this.WidgetList[i]);
@@ -1009,6 +1074,8 @@ Viewer.prototype.HandleMouseMove = function(event) {
       }
     }
   }
+  
+  this.SetCursor("default");
     
   if (event.MouseDown == false) {
     return;

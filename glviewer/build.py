@@ -17,8 +17,8 @@ projectRootDir = os.path.dirname( os.path.realpath(__file__) )
 jsFiles = ["glMatrix-0.9.5.min.js", "webgl-utils.js", "cookies.js", "viewEditMenu.js",
 "viewBrowser.js", "dualViewWidget.js", "annotationWidget.js", "recorderWidget.js", "viewer-utils.js",
 "init.js", "loader.js", "camera.js", "tile.js", "cache.js", "section.js", "view.js", "viewer.js",
-"arrowWidget.js", "circleWidget.js", "textWidget.js", "polylineWidget.js", "pencilWidget.js", "widgetPopup.js", "notesWidget.js",
-"shape.js", "crossHairs.js", "arrow.js", "circle.js", "polyline.js","text.js", "eventManager.js", 'utils.js']
+"arrowWidget.js", "circleWidget.js", "textWidget.js", "polylineWidget.js", "pencilWidget.js", "widgetPopup.js", "notesWidget.js", "rectangleWidget.js",
+"shape.js", "crossHairs.js", "arrow.js", "circle.js", "polyline.js","text.js", "eventManager.js", 'utils.js', 'geojson/geojson-utils.js']
 
 def buildLib(projectRootDir, minified):
   buffer = []

@@ -22,7 +22,11 @@ function CircleWidget (viewer, newFlag) {
     return;
   }
   this.Popup = new WidgetPopup(this);
+  this.ShowPopup = true;
   this.Viewer = viewer;
+  this.IsTextActive = false;
+  this.IsShapeUpdate = false;
+  this.MiddleCrossOffset = 100;
   var cam = viewer.MainView.Camera;
   var viewport = viewer.MainView.Viewport;
   this.Shape = new Circle();
@@ -31,6 +35,9 @@ function CircleWidget (viewer, newFlag) {
   this.Shape.Radius = 50*cam.Height/viewport[3];
   this.Shape.LineWidth =  5.0*cam.Height/viewport[3];
   this.Shape.FixedSize = false;
+  
+  this.TextShape = false;
+  this.DrawnCallback = function(widget){};
   
   this.Viewer.WidgetList.push(this);
 
@@ -48,6 +55,77 @@ function CircleWidget (viewer, newFlag) {
 
 CircleWidget.prototype.Draw = function(view) {
    this.Shape.Draw(view);
+   
+   // draw cross middle if editable
+   if(this.Viewer.AnnotationEditable && this.Shape.Radius > 200)
+     { 
+     var vertical = new Polyline();
+     vertical.OutlineColor = [0.6, 0.6, 0.6];
+     vertical.FixedSize = false;
+     vertical.Points = [];
+     vertical.Points.push([this.Shape.Origin[0] - this.MiddleCrossOffset, this.Shape.Origin[1]]);
+     vertical.Points.push([this.Shape.Origin[0] + this.MiddleCrossOffset, this.Shape.Origin[1]]);
+     vertical.UpdateBuffers();
+     vertical.Draw(view)     
+          
+     var horizontal = new Polyline();     
+     horizontal.OutlineColor = [0.6, 0.6, 0.6];     
+     horizontal.FixedSize = false;
+     horizontal.Points = [];
+     horizontal.Points.push([this.Shape.Origin[0], this.Shape.Origin[1] - this.MiddleCrossOffset]);
+     horizontal.Points.push([this.Shape.Origin[0], this.Shape.Origin[1] + this.MiddleCrossOffset]);
+     horizontal.UpdateBuffers();
+     horizontal.Draw(view)
+     }
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    this.UpdatetTextPosition(view)
+    this.TextShape.Draw(view);  
+    }
+  else if(this.Viewer.AnnotationEditable)
+    {
+    this.SetText("Add Label", 12)
+    this.TextShape.Color =  [0.6, 0.6, 0.6];
+    this.UpdatetTextPosition(view);
+    this.TextShape.Draw(view);
+    this.TextShape = false;
+    }
+}
+
+CircleWidget.prototype.UpdatetTextPosition = function(view) {
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    this.TextShape.Position= this.Shape.Origin; 
+    var offset = -5 - this.Viewer.GetPixelsPerUnit()*this.Shape.Radius;
+    var scale = this.Viewer.MainView.Viewport[3] / this.Viewer.MainView.Camera.GetHeight();
+    view.Context2d.font = this.TextShape.Size+'pt Calibri';
+    var width = view.Context2d.measureText(this.TextShape.String).width;    
+    this.TextShape.Anchor = [width/2, offset - (scale * this.Shape.LineWidth)/2];
+    }
+}
+
+CircleWidget.prototype.GetSelectBounds = function() {
+  var offset = this.Shape.Radius;
+  var pt1 = [this.Shape.Origin[0]  - offset, this.Shape.Origin[1] + offset];
+  var pt2 = [this.Shape.Origin[0] + offset, this.Shape.Origin[1]- offset];
+  return [pt1,pt2];
+}
+
+CircleWidget.prototype.SetDrawnCallback = function(callback) {
+    this.DrawnCallback = callback;
+}
+
+CircleWidget.prototype.EnableWidgetPopup = function(enable) {
+    this.ShowPopup = (enable == 1 || enable);
+}
+
+CircleWidget.prototype.SetText = function(text, height) {
+  this.TextShape = new Text();
+  this.TextShape.String = text;  
+  this.TextShape.Size = height;  
+  this.TextShape.Color = this.Shape.OutlineColor;
+  this.TextShape.Position= this.Shape.Origin; 
+  this.TextShape.UpdateBuffers(); 
 }
 
 // This needs to be put in the Viewer.
@@ -69,6 +147,10 @@ CircleWidget.prototype.Serialize = function() {
   obj.outlinecolor = this.Shape.OutlineColor;
   obj.radius = this.Shape.Radius;
   obj.linewidth = this.Shape.LineWidth;
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    obj.text = this.TextShape.String;
+    }
   return obj;
 }
 
@@ -104,6 +186,7 @@ CircleWidget.prototype.HandleMouseDown = function(event) {
   if (this.State == CIRCLE_WIDGET_ACTIVE) {
     // Determine behavior from active radius.
     if (this.NormalizedActiveDistance < 0.5) {
+      this.Viewer.SetCursor("move");
       this.State = CIRCLE_WIDGET_DRAG;
     } else {
       this.OriginViewer = this.Viewer.ConvertPointWorldToViewer(this.Shape.Origin[0], this.Shape.Origin[1]);
@@ -115,8 +198,11 @@ CircleWidget.prototype.HandleMouseDown = function(event) {
 // returns false when it is finished doing its work.
 CircleWidget.prototype.HandleMouseUp = function(event) {
   if ( this.State == CIRCLE_WIDGET_DRAG ||  this.State == CIRCLE_WIDGET_DRAG_RADIUS) {
+    this.DrawnCallback(this);
     this.SetActive(false);
     RecordState();
+    if(this.IsShapeUpdate)this.Viewer.UpdateCallback(this);
+    this.IsShapeUpdate = false;
   }
 }
 
@@ -131,6 +217,7 @@ CircleWidget.prototype.HandleMouseMove = function(event) {
   
   if (this.State == CIRCLE_WIDGET_NEW || this.State == CIRCLE_WIDGET_DRAG) {
     this.Shape.Origin = this.Viewer.ConvertPointViewerToWorld(x, y);
+    this.IsShapeUpdate = true;
     eventuallyRender();
   }
   
@@ -142,6 +229,7 @@ CircleWidget.prototype.HandleMouseMove = function(event) {
     // Change units from pixels to world.
     this.Shape.Radius = Math.sqrt(dx*dx + dy*dy) * cam.Height / viewport[3];
     this.Shape.UpdateBuffers();
+    this.IsShapeUpdate = true;
     eventuallyRender();
   }
   
@@ -178,7 +266,9 @@ CircleWidget.prototype.HandleTouchEnd = function(event) {
 CircleWidget.prototype.CheckActive = function(event) {
   var x = event.MouseX;
   var y = event.MouseY;
-
+  
+  this.IsTextActive = false;
+  
   // change dx and dy to vector from center of circle.
   if (this.FixedSize) {
     dx = event.MouseX - this.Shape.Origin[0];
@@ -193,11 +283,55 @@ CircleWidget.prototype.CheckActive = function(event) {
   var lineWidth = this.Shape.LineWidth / this.Shape.Radius;
   this.NormalizedActiveDistance = d;
   
+  var textOriginScreenPixelPosition;
+  var tMouseX = null;
+  var tMouseY = null;
+  
+  if(this.TextShape != false && this.TextShape.String != "")
+    {
+    textOriginScreenPixelPosition = this.Viewer.ConvertPointWorldToViewer(this.TextShape.Position[0],this.TextShape.Position[1]);
+    
+    tMouseX = (x - textOriginScreenPixelPosition[0]) + this.TextShape.Anchor[0];  
+    tMouseY = (y - textOriginScreenPixelPosition[1]) + this.TextShape.Anchor[1];  
+   
+    if(tMouseX > this.TextShape.PixelBounds[0] && tMouseX < this.TextShape.PixelBounds[1] &&
+      tMouseY > this.TextShape.PixelBounds[2] && tMouseY < this.TextShape.PixelBounds[3])
+      {
+      this.Viewer.SetCursor("text");
+      active = true;
+      this.IsTextActive = true;
+      }
+    }
+  else if(this.Viewer.AnnotationEditable)
+    {
+    textOriginScreenPixelPosition = this.Viewer.ConvertPointWorldToViewer(this.Shape.Origin[0], this.Shape.Origin[1] + this.Shape.Radius);
+    tMouseX = (x - textOriginScreenPixelPosition[0] );  
+    tMouseY = (y - textOriginScreenPixelPosition[1] - 12);  
+    if(Math.abs(tMouseX) < 35 && Math.abs(tMouseY) < 6)   
+      {
+      this.SetActive(true);
+      this.IsTextActive = true;
+      this.Viewer.SetCursor("text");
+      return true;
+      }
+    }
+  
   if (this.Shape.FillColor == undefined) { // Circle 
-    if ((d < (1.0+ this.Tolerance +lineWidth) && d > (1.0-this.Tolerance))  || 
-         d < (this.Tolerance+lineWidth)) {
+    if ((d < (1.0+ this.Tolerance +lineWidth) && d > (1.0-this.Tolerance))) {
+      var pt = this.Viewer.ConvertPointViewerToWorld(x, y);
+      if(pt[1] > (this.Shape.Origin[1] + this.Shape.Radius*0.5) ||
+        pt[1] < (this.Shape.Origin[1] - this.Shape.Radius*0.5))
+        {
+        this.Viewer.SetCursor("ns-resize");
+        }
+      else this.Viewer.SetCursor("ew-resize");
       active = true;
     }
+    else if(d < (this.Tolerance+lineWidth))
+      {
+      this.Viewer.SetCursor("move");
+      active = true;
+      }
   } else { // Disk
     if (d < (1.0+this.Tolerance+lineWidth) && d > (this.Tolerance+lineWidth) || 
         d < lineWidth) {
@@ -221,6 +355,7 @@ CircleWidget.prototype.Deactivate = function() {
   this.Popup.StartHideTimer(); 
   this.State = CIRCLE_WIDGET_WAITING;
   this.Shape.Active = false;
+  if(this.TextShape != false) this.TextShape.Active = false;
   this.Viewer.DeactivateWidget(this);
   eventuallyRender();
 }
@@ -235,6 +370,7 @@ CircleWidget.prototype.SetActive = function(flag) {
   if (flag) {
     this.State = CIRCLE_WIDGET_ACTIVE;  
     this.Shape.Active = true;
+    if(this.TextShape != false) this.TextShape.Active = true;
     this.Viewer.ActivateWidget(this);
     eventuallyRender();
     // Compute the location for the pop up and show it.
@@ -242,7 +378,7 @@ CircleWidget.prototype.SetActive = function(flag) {
     var x = this.Shape.Origin[0] + 0.8 * this.Shape.Radius * (Math.cos(roll) + Math.sin(roll));
     var y = this.Shape.Origin[1] + 0.8 * this.Shape.Radius * (Math.cos(roll) - Math.sin(roll));
     var pt = this.Viewer.ConvertPointWorldToViewer(x, y);
-    this.Popup.Show(pt[0],pt[1]);
+    if(this.ShowPopup) this.Popup.Show(pt[0],pt[1]);
   } else {
     this.Deactivate();
   }
