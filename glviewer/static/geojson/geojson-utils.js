@@ -90,6 +90,15 @@ geoJson.Io.createObj = {
     VIEWER1.LoadWidget(obj);
   },
   
+  "pencil": function(feature) {
+    var obj = {}
+    obj.type = "pencil";
+    obj.shapes = feature.geometry.coordinates;
+    obj.outlinecolor = feature.properties.outlinecolor;
+    obj.linewidth = feature.properties.linewidth;
+    VIEWER1.LoadWidget(obj);
+  },
+  
   "arrow": function(feature) {
     var obj = {}
     obj.type = "arrow";
@@ -146,23 +155,6 @@ geoJson.Io.createObj = {
      // rings.push(r);
     }
      // Todo Create 
-  },
-
-
-  "box": function(array) {
-    if(array.length != 2) {
-      throw "GeoJSON box coordinates must have 2 elements";
-    }
-         // Todo Create 
-  /*  return new OpenLayers.Geometry.Polygon([
-      new OpenLayers.Geometry.LinearRing([
-        new OpenLayers.Geometry.Point(array[0][0], array[0][1]),
-        new OpenLayers.Geometry.Point(array[1][0], array[0][1]),
-        new OpenLayers.Geometry.Point(array[1][0], array[1][1]),
-        new OpenLayers.Geometry.Point(array[0][0], array[1][1]),
-        new OpenLayers.Geometry.Point(array[0][0], array[0][1])
-        ])
-      ]);*/
   }
 
 },
@@ -277,6 +269,10 @@ geoJson.Io.extract ={
   
   'rectangle': function(rectangle) {
     return rectangle.points;
+  },
+  
+  'pencil': function(rectangle) {
+    return rectangle.shapes;
   },
   
   'arrow': function(arrow) {

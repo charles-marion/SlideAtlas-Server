@@ -375,8 +375,6 @@ RectangleWidget.prototype.HandleMouseMove = function(event) {
   var pt = this.Viewer.ConvertPointViewerToWorld(x,y);
   var topLeft;
   var bottomRight;
-  
-  
 
   if (this.State == RECTANGLE_WIDGET_NEW_FACE) {
     var center =  this.CenterDragPoint;
