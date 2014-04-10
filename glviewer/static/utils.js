@@ -51,7 +51,7 @@ function setWidgetText(widget, text, height)
     }
   }
 
-function setActiveWidget(type)
+function setActiveWidget(type, lineWidth)
   {
   var color = "green";
   if(typeof VIEWER1.ActiveColor != "undefined")
@@ -62,12 +62,14 @@ function setActiveWidget(type)
     {
     var widget = new CircleWidget(VIEWER1, true);
     widget.EnableWidgetPopup(false);
+    widget.Shape.LineWidth = lineWidth;
     VIEWER1.ActiveWidget = widget;
     VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);
     }
   else if(type == "rectangle")
     {
     var widget = new RectangleWidget(VIEWER1, true);
+    widget.Shape.LineWidth = lineWidth;
     VIEWER1.ActiveWidget = widget;
     VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);
     }
@@ -80,12 +82,19 @@ function setActiveWidget(type)
   else if(type == "pencil")
     {
     var widget = new PencilWidget(VIEWER1, true, false, true);
+    widget.LineWidth = lineWidth;
     VIEWER1.ActiveWidget = widget;
     VIEWER1.ActiveWidget.SetOutlineColor(color);
     }
+  else if(type == "ruler")
+    {
+    var widget = new PolylineWidget(VIEWER1, true, true); 
+    widget.Shape.LineWidth = lineWidth;
+    VIEWER1.ActiveWidget = widget;
+    VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);
+    }
   else if(VIEWER1.ActiveWidget != null)
     {
-    VIEWER1.ActiveWidget.RemoveFromViewer();
     VIEWER1.ActiveWidget.SetActive(false);
     }
   }
@@ -99,9 +108,10 @@ function setActiveColor(color)
   {
   VIEWER1.ActiveColor = color;
   if(VIEWER1.ActiveWidget instanceof CircleWidget ||
+     VIEWER1.ActiveWidget instanceof PolylineWidget ||
     VIEWER1.ActiveWidget instanceof RectangleWidget   )
     {
-    VIEWER1.ActiveWidget.Shape.OutlineColor = color;
+    VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);
     if(VIEWER1.ActiveWidget.TextShape != false)
       {
       VIEWER1.ActiveWidget.TextShape.Color = VIEWER1.ActiveWidget.Shape.OutlineColor;

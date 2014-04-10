@@ -107,7 +107,7 @@ Circle.prototype.UpdateBuffers = function() {
       this.LineCellBuffer.numItems = lineCellData.length;
     }
   } else {
-    for (var i = 0; i <= numEdges; ++i) {
+    for (var i = 0; i <= numEdges + 2; ++i) {
       var theta = i*2*3.14159265359/numEdges;
       this.PointBuffer.push(this.Radius*Math.cos(theta));
       this.PointBuffer.push(this.Radius*Math.sin(theta));

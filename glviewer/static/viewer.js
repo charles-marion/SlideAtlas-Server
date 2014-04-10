@@ -99,6 +99,13 @@ Viewer.prototype.GetAnnotationEditable = function() {
   
 Viewer.prototype.SetAnnotationEditable = function(vis) {
   this.AnnotationEditable = vis;
+  if(vis == false)
+    {
+    for (var i = 0; i < this.WidgetList.length; ++i) 
+      {
+      this.WidgetList[i].Desactivate();
+      }
+    }
 }  
 
 
@@ -512,8 +519,8 @@ Viewer.prototype.Draw = function() {
         var bounds = this.SelectedWidget.GetSelectBounds();
         var rectangle = new Polyline();
         
-        var mainpt = [bounds[0][0] + 10, bounds[0][1] +10];
-        var pt = [bounds[1][0] + 10, bounds[1][1] +10];
+        var mainpt = [bounds[0][0], bounds[0][1]];
+        var pt = [bounds[1][0], bounds[1][1]];
         rectangle.OutlineColor = [0.6, 0.6, 0.6];
         rectangle.FixedSize = false;
         rectangle.Points = [];

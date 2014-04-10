@@ -113,49 +113,18 @@ geoJson.Io.createObj = {
     obj.linewidth = feature.properties.linewidth;
     VIEWER1.LoadWidget(obj);
   },
-
-  "multipoint": function(array) {
-    var points = [];
-    var p = null;
-    for(var i=0, len=array.length; i<len; ++i) {
-      try {
-        p = this.parseCoords["point"].apply(this, [array[i]]);
-      } catch(err) {
-        throw err;
-      }
-      points.push(p);
-    }   
-  },
-
-
-  "linestring": function(array) {
-    var points = [];
-    var p = null;
-    for(var i=0, len=array.length; i<len; ++i) {
-      try {
-        p = this.parseCoords["point"].apply(this, [array[i]]);
-      } catch(err) {
-        throw err;
-      }
-      points.push(p);
-    }
-    // Todo Create line
-  },
-                
-  "polygon": function(array) {
-    var rings = [];
-    var r, l;
-    for(var i=0, len=array.length; i<len; ++i) {
-      try {
-        l = this.parseCoords["linestring"].apply(this, [array[i]]);
-      } catch(err) {
-        throw err;
-      }
-     // r = new OpenLayers.Geometry.LinearRing(l.components);
-     // rings.push(r);
-    }
-     // Todo Create 
+  
+   "polyline": function(feature) {
+    var obj = {}
+    obj.type = "polyline";
+    obj.points = feature.geometry.coordinates.points;
+    obj.spacing = feature.geometry.coordinates.spacing;
+    obj.closedloop = feature.geometry.coordinates.closedloop;
+    obj.outlinecolor = feature.properties.outlinecolor;
+    obj.linewidth = feature.properties.linewidth;
+    VIEWER1.LoadWidget(obj);
   }
+  
 
 },
 
@@ -285,61 +254,13 @@ geoJson.Io.extract ={
     };
   },
  
-  'multipoint': function(multipoint) {
-    var array = [];
-    for(var i=0, len=multipoint.components.length; i<len; ++i) {
-      array.push(this.extract.point.apply(this, [multipoint.components[i]]));
+  'polyline': function(multipoint) {
+    var array = {points: multipoint.points,
+      closedloop: multipoint.closedloop,
+      spacing: multipoint.spacing
     }
     return array;
-  },
-        
- 
-  'linestring': function(linestring) {
-    var array = [];
-    for(var i=0, len=linestring.components.length; i<len; ++i) {
-      array.push(this.extract.point.apply(this, [linestring.components[i]]));
-    }
-    return array;
-  },
-
- 
-  'multilinestring': function(multilinestring) {
-    var array = [];
-    for(var i=0, len=multilinestring.components.length; i<len; ++i) {
-      array.push(this.extract.linestring.apply(this, [multilinestring.components[i]]));
-    }
-    return array;
-  },
-        
- 
-  'polygon': function(polygon) {
-    var array = [];
-    for(var i=0, len=polygon.components.length; i<len; ++i) {
-      array.push(this.extract.linestring.apply(this, [polygon.components[i]]));
-    }
-    return array;
-  },
-
-  'multipolygon': function(multipolygon) {
-    var array = [];
-    for(var i=0, len=multipolygon.components.length; i<len; ++i) {
-      array.push(this.extract.polygon.apply(this, [multipolygon.components[i]]));
-    }
-    return array;
-  },
-        
- 
-  'collection': function(collection) {
-    var len = collection.components.length;
-    var array = new Array(len);
-    for(var i=0; i<len; ++i) {
-      array[i] = this.extract.geometry.apply(
-        this, [collection.components[i]]
-        );
-    }
-    return array;
-  }
-        
+  }               
 
 }
     

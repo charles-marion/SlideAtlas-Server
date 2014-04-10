@@ -214,6 +214,9 @@ Text.prototype.Draw = function (view) {
     ctx.save();
     ctx.setTransform(1,0,0,1,0,0);
     ctx.font = this.Size+'pt Calibri';
+    ctx.shadowColor = "white";
+    ctx.shadowBlur = 2;
+    
     if (this.Active) {
       ctx.fillStyle = ConvertColorToHex([1.0,1.0,0.0]);
     } else {

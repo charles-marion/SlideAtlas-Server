@@ -18,10 +18,11 @@ var POLYLINE_WIDGET_ACTIVE = 5;
 var POLYLINE_WIDGET_PROPERTIES_DIALOG = 6;
 
 
-function PolylineWidget (viewer, newFlag) {
+function PolylineWidget (viewer, newFlag, oneLineOnly) {
   if (viewer === undefined) {
     return;
   }
+  if(typeof oneLineOnly == "undefined") oneLineOnly = false;
   var cam = viewer.MainView.Camera;
   var viewport = viewer.MainView.Viewport;
 
@@ -34,6 +35,14 @@ function PolylineWidget (viewer, newFlag) {
   this.Circle.OutlineColor = [0.0,0.0,0.0];
   this.Circle.FixedSize = false;
   this.Circle.ZOffset = -0.05;
+  
+  this.Spacing = false;
+  this.RulerShape = false;
+  
+  this.OneLineOnly = oneLineOnly; // It means the widget is disable when mouse up
+  this.IsShapeUpdate = false;
+  
+  this.DrawnCallback = function(widget){};
 
   this.Shape = new Polyline();
 	this.Shape.OutlineColor = [0.0, 0.0, 0.0];
@@ -47,6 +56,7 @@ function PolylineWidget (viewer, newFlag) {
   this.Circle.UpdateBuffers();
   
   if (newFlag) {
+    this.Viewer.SetCursor("crosshair");
     this.State = POLYLINE_WIDGET_NEW;
     this.Shape.Active = true;
     this.ActiveVertex = -1;
@@ -63,6 +73,117 @@ function PolylineWidget (viewer, newFlag) {
 PolylineWidget.prototype.Draw = function(view) {
     this.Shape.Draw(view);
     this.Circle.Draw(view);
+    if(this.RulerShape != false && this.RulerShape.String != "")
+      {
+      this.UpdatetRulerLabelPosition(view);
+      this.RulerShape.Draw(view);  
+      }
+}
+
+PolylineWidget.prototype.UpdatetRulerLabelPosition = function(view) {
+  if(this.RulerShape != false && this.RulerShape.String != "")
+    {    
+    var bounds = this.GetSelectBounds()
+    this.RulerShape.Position[0] = bounds[0][0] + (bounds[1][0] - bounds[0][0])/2; 
+    this.RulerShape.Position[1] = bounds[1][1]; 
+    var scale = this.Viewer.MainView.Viewport[3] / this.Viewer.MainView.Camera.GetHeight();
+    view.Context2d.font = this.RulerShape.Size+'pt Calibri';
+    var width = view.Context2d.measureText(this.RulerShape.String).width;    
+    
+    var deltaY = this.Shape.Points[1][1] - this.Shape.Points[0][1];
+    var deltaX = this.Shape.Points[1][0] - this.Shape.Points[0][0];
+    if(Math.abs(deltaY) >  30 / this.Viewer.GetPixelsPerUnit())
+      {
+      if(deltaY > 0 && deltaX > 0 || deltaY < 0 && deltaX < 0)
+        {
+        this.RulerShape.Position[0] = bounds[0][0] + (bounds[1][0] - bounds[0][0])/2; 
+        this.RulerShape.Position[1] = bounds[1][1] - (bounds[1][1] - bounds[0][1])/2 ; 
+        this.RulerShape.Anchor = [-width/2  ,0];
+        }
+      else
+        {
+        this.RulerShape.Position[0] = bounds[1][0] - (bounds[1][0] - bounds[0][0])/2; 
+        this.RulerShape.Position[1] = bounds[1][1] - (bounds[1][1] - bounds[0][1])/2; 
+        this.RulerShape.Anchor = [-width/2  ,0];
+        }    
+      }
+    else
+      {
+      this.RulerShape.Position[0] = bounds[0][0] + (bounds[1][0] - bounds[0][0])/2; 
+      this.RulerShape.Position[1] = bounds[1][1]; 
+      this.RulerShape.Anchor = [width/2, -5 - scale * 10];
+      }    
+
+
+    this.RulerShape.UpdateBuffers();
+    }
+}
+
+PolylineWidget.prototype.ShowRuler = function(spacing) {
+  if(this.OneLineOnly == false)
+    {
+    alert('Error: The ruler is only available is we show one line.');
+    return;
+    }
+  this.Spacing = spacing;
+  
+  this.RulerShape = new Text();
+  this.RulerShape.String = "";  
+  this.RulerShape.Size = 12;  
+  this.RulerShape.Color = this.Shape.OutlineColor;
+  this.RulerShape.UpdateBuffers(); 
+  
+  this.UpdateRuler(spacing);
+}
+
+PolylineWidget.prototype.UpdateRuler = function(spacing) {
+  if(spacing == false) return;
+  var bounds = this.GetSelectBounds();
+  var distanceX = bounds[1][0] - bounds[0][0];
+  var distanceY = bounds[1][1] - bounds[0][1];
+  var distancePixel = Math.sqrt((distanceX * distanceX) + (distanceY * distanceY));
+  var distanceUm = distancePixel * spacing * 1000; // the spacing is in mm
+  
+  if(distanceUm > 1000)
+    {
+    this.RulerShape.String = ""+(distanceUm/1000).toFixed(2)+"mm"; 
+    }
+  else
+    {
+    this.RulerShape.String = ""+distanceUm.toFixed(2)+"µm"; 
+    }  
+}
+
+PolylineWidget.prototype.GetSelectBounds = function() {  
+  var x1 = false;
+  var x2 = false;
+  var y1 = false;
+  var y2 = false;
+  
+  for(var i = 0; i < this.Shape.Points.length; ++i) 
+    {
+    var x = this.Shape.Points[i][0];
+    var y = this.Shape.Points[i][1];
+
+    if(x1 == false || x < x1)
+      {
+      x1 = x;
+      }
+    if(x2 == false || x > x2)
+      {
+      x2 = x;
+      }
+    if(y1 == false || y < y1)
+      {
+      y1 = y;
+      }
+    if(y2 == false || y > y2)
+      {
+      y2 = y;
+      }      
+    }
+    
+  return [[x1, y1], [x2, y2]];
 }
 
 
@@ -76,8 +197,8 @@ PolylineWidget.prototype.Serialize = function() {
   obj.points = [];
   for (var i = 0; i < this.Shape.Points.length; ++i) {
     obj.points.push([this.Shape.Points[i][0], this.Shape.Points[i][1]]);
-  }
-  
+  }  
+  obj.spacing = this.Spacing;
   obj.closedloop = this.ClosedLoop;
   return obj;
 }
@@ -93,6 +214,12 @@ PolylineWidget.prototype.Load = function(obj) {
                             parseFloat(obj.points[n][1])];
   }
   this.ClosedLoop = (obj.closedloop == "true");
+  if(obj.spacing != "false")
+    {
+    this.OneLineOnly = true;
+    this.ShowRuler(obj.spacing)
+    }
+  
   this.Shape.UpdateBuffers();
 }
 
@@ -139,6 +266,7 @@ PolylineWidget.prototype.HandleMouseDown = function(event) {
     this.ActivateVertex(-1);
     this.State = POLYLINE_WIDGET_NEW_EDGE;
     eventuallyRender();
+    this.IsShapeUpdate = true;
     return;
   }
   if (this.State == POLYLINE_WIDGET_NEW_EDGE) {
@@ -157,10 +285,11 @@ PolylineWidget.prototype.HandleMouseDown = function(event) {
     this.Shape.Points.push(pt);
     this.Shape.UpdateBuffers();
     eventuallyRender();
+    this.IsShapeUpdate = true;
     return;
   }
 
-  if (this.State == POLYLINE_WIDGET_MIDPOINT_ACTIVE) {
+  if (this.State == POLYLINE_WIDGET_MIDPOINT_ACTIVE && this.OneLineOnly == false) {
     // Compute the midpoint.
     var x = 0.5 * (this.Shape.Points[this.ActiveMidpoint-1][0] + this.Shape.Points[this.ActiveMidpoint][0]);
     var y = 0.5 * (this.Shape.Points[this.ActiveMidpoint-1][1] + this.Shape.Points[this.ActiveMidpoint][1]);
@@ -170,11 +299,16 @@ PolylineWidget.prototype.HandleMouseDown = function(event) {
     this.ActivateVertex(this.ActiveMidpoint);
     this.ActiveMidpoint = -1;
     this.State = POLYLINE_WIDGET_VERTEX_ACTIVE; // Activate vertex probably does this.
+    this.IsShapeUpdate = true;
     }
 
   if (this.State == POLYLINE_WIDGET_ACTIVE) {
     this.LastMouseWorld = pt;
   }
+}
+
+PolylineWidget.prototype.SetDrawnCallback = function(callback) {
+    this.DrawnCallback = callback;
 }
 
 // Returns false when it is finished doing its work.
@@ -190,10 +324,23 @@ PolylineWidget.prototype.HandleMouseUp = function(event) {
   }
 
   if (event.SystemEvent.which == 1) {
+    if (this.State == POLYLINE_WIDGET_NEW_EDGE) {
+      if(this.OneLineOnly)
+        {
+        this.Deactivate();
+        }
+      this.DrawnCallback(this);
+      if(this.IsShapeUpdate)
+        {
+        this.Viewer.UpdateCallback(this);
+        this.UpdateRuler(this.Spacing);
+        }
+      this.IsShapeUpdate = false;      
+    }
     if (this.State == POLYLINE_WIDGET_VERTEX_ACTIVE ||
         this.State == POLYLINE_WIDGET_ACTIVE) {
       // Dragging a vertex or the whole polyline.
-      RecordState();
+      RecordState();      
     }
   }
 
@@ -217,6 +364,7 @@ PolylineWidget.prototype.HandleMouseMove = function(event) {
     var idx = this.WhichVertexShouldBeActive(pt);
     // Only the first or last vertexes will stop the new line.
     this.ActivateVertex(idx);
+    this.UpdateRuler(this.Spacing);
     eventuallyRender();
     return;
   }
@@ -254,6 +402,7 @@ PolylineWidget.prototype.HandleMouseMove = function(event) {
         }
       this.Circle.Origin = pt;
       this.Shape.UpdateBuffers();
+      this.UpdateRuler(this.Spacing);
       eventuallyRender();
     }
   }
@@ -320,27 +469,30 @@ PolylineWidget.prototype.CheckActive = function(event) {
   }
 
   // Check for the mouse over a midpoint.
-  var r2 = this.Circle.Radius * this.Circle.Radius;
-  for (idx = 1; idx < this.Shape.Points.length; ++idx) {
-    x = 0.5 *(this.Shape.Points[idx-1][0] + this.Shape.Points[idx][0]);
-    y = 0.5 *(this.Shape.Points[idx-1][1] + this.Shape.Points[idx][1]);
-    var dx = pt[0] - x;
-    var dy = pt[1] - y;
-    if ((dx*dx + dy*dy) <= r2) {
-      this.Circle.Visibility = true;
-      this.Circle.Origin = [x, y];
-      this.State = POLYLINE_WIDGET_MIDPOINT_ACTIVE;
-      this.Shape.Active = false;
-      this.ActiveMidpoint = idx;
-      return true;
-      }
-  }
+  if(this.OneLineOnly == false){
+    var r2 = this.Circle.Radius * this.Circle.Radius;
+    for (idx = 1; idx < this.Shape.Points.length; ++idx) {
+      x = 0.5 *(this.Shape.Points[idx-1][0] + this.Shape.Points[idx][0]);
+      y = 0.5 *(this.Shape.Points[idx-1][1] + this.Shape.Points[idx][1]);
+      var dx = pt[0] - x;
+      var dy = pt[1] - y;
+      if ((dx*dx + dy*dy) <= r2) {
+        this.Circle.Visibility = true;
+        this.Circle.Origin = [x, y];
+        this.State = POLYLINE_WIDGET_MIDPOINT_ACTIVE;
+        this.Shape.Active = false;
+        this.ActiveMidpoint = idx;
+        return true;
+        }
+    }
+  }  
   
   // Check for mouse touching an edge.
   for (var i = 1; i < this.Shape.Points.length; ++i) {
     if (this.Shape.IntersectPointLine(pt, this.Shape.Points[i-1], this.Shape.Points[i], this.Shape.LineWidth)) {
       this.State = POLYLINE_WIDGET_ACTIVE;
       this.Shape.Active = true;
+      this.Viewer.SetCursor("move");
       return true;
     }
   }

@@ -28,6 +28,7 @@ function PencilWidget (viewer, newFlag, showIcon, oneLineOnly) {
   this.IsTextActive = false;
   this.OutlineColor = [0.9, 1.0, 0.0];
   this.TextShape = false;
+  this.LineWidth = 0;
   this.OneLineOnly = oneLineOnly; // It means the widget is disable when mouse up
   this.DrawnCallback = function(widget){};
   this.ActivePoint = false;  
@@ -139,6 +140,7 @@ PencilWidget.prototype.Serialize = function() {
   obj.type = "pencil";
   obj.outlinecolor = this.OutlineColor;
   obj.shapes = [];
+  obj.linewidth = this.LineWidth;
   for (var i = 0; i < this.Shapes.length; ++i) {
     var shape = this.Shapes[i];
     var points = [];
@@ -176,7 +178,7 @@ PencilWidget.prototype.Load = function(obj) {
     var shape = new Polyline();
     shape.OutlineColor = this.OutlineColor
     shape.FixedSize = false;
-    shape.LineWidth = 0;
+    shape.LineWidth = obj.linewidth;
     this.Shapes.push(shape);
     for (var m = 0; m < points.length; ++m) {
       shape.Points[m] = [points[m][0], points[m][1]];
@@ -215,7 +217,7 @@ PencilWidget.prototype.HandleMouseDown = function(event) {
       shape.OutlineColor = [0.9, 1.0, 0.0];
       shape.FixedSize = false;
       shape.Active = false;
-      shape.LineWidth = 0;
+      shape.LineWidth = this.LineWidth;
       this.Shapes.push(shape);
 
       var pt = this.Viewer.ConvertPointViewerToWorld(x,y);  

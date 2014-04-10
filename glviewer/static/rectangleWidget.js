@@ -64,8 +64,8 @@ RectangleWidget.prototype.Draw = function(view) {
   this.Shape.Draw(view);
   
   // draw cross middle if editable
-  if(this.Viewer.AnnotationEditable)
-    { 
+  if(this.Viewer.AnnotationEditable && Math.abs(this.Shape.Points[0][0] - this.Shape.Points[1][0]) > 3* this.MiddleCrossOffset)
+    {     
     var vertical = new Polyline();
     var center = [0,0];
     center[0] = this.Shape.Points[0][0] - (this.Shape.Points[0][0] - this.Shape.Points[1][0])/2;
@@ -184,7 +184,8 @@ RectangleWidget.prototype.CheckActive = function(event) {
   center[0] = this.Shape.Points[0][0] - (this.Shape.Points[0][0] - this.Shape.Points[1][0])/2;
   center[1] = this.Shape.Points[0][1] - (this.Shape.Points[0][1] - this.Shape.Points[2][1])/2;
   if(center[0] + this.MiddleCrossOffset > pt[0] &&  center[0] - this.MiddleCrossOffset < pt[0] &&
-     center[1] + this.MiddleCrossOffset > pt[1] &&  center[1] - this.MiddleCrossOffset < pt[1] )
+     center[1] + this.MiddleCrossOffset > pt[1] &&  center[1] - this.MiddleCrossOffset < pt[1] && 
+      Math.abs(this.Shape.Points[0][0] - this.Shape.Points[1][0]) > 3* this.MiddleCrossOffset)
      {
      this.Viewer.SetCursor("move");
      this.SetActive(true);
