@@ -22,7 +22,6 @@ function Camera (viewportWidth, viewportHeight) {
 
 Camera.prototype.SetViewport = function (viewport) {
   if (10*viewport[3] < viewport[2]) {
-    alert("Unusual viewport " + viewport[3]);
     return;
   }
   this.ViewportWidth = viewport[2];

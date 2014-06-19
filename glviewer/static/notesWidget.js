@@ -805,7 +805,7 @@ Note.prototype.LoadViewId = function(viewId) {
            "viewid": viewId,
            "db"  : GetSessionDatabase()},
     success: function(data,status) { self.Load(data);},
-    error: function() { alert( "AJAX - error() : getview" ); },
+    error: function() { alert( "AJAX - error() : getview" ); }
     });  
 }
 
@@ -821,7 +821,7 @@ Note.prototype.RequestUserNotes = function() {
     data: {"parentid": this.Id,
            "db"  : GetSessionDatabase()},
     success: function(data,status) { self.LoadUserNotes(data);},
-    error: function() { alert( "AJAX - error() : getchildnotes" ); },
+    error: function() { alert( "AJAX - error() : getchildnotes" ); }
     });  
 }
 
@@ -913,7 +913,7 @@ NotesWidget.prototype.SaveUserNote = function() {
     data: {"note": JSON.stringify(childNote.Serialize(false)),
            "date": d.getTime()},
     success: function(data,status) { childNote.Id = data;},
-    error: function() { alert( "AJAX - error() : saveusernote" ); },
+    error: function() { alert( "AJAX - error() : saveusernote" ); }
     });  
   
   // Redraw the GUI. should we make the parent or the new child active?
@@ -938,7 +938,7 @@ NotesWidget.prototype.SaveBrownNote = function() {
     url: "/webgl-viewer/saveusernote",
     data: {"note": JSON.stringify(note.Serialize(false))},
     success: function(data,status) { note.Id = data;},
-    error: function() { alert( "AJAX - error() : saveusernote" ); },
+    error: function() { alert( "AJAX - error() : saveusernote" ); }
     });  
 }
 
@@ -1109,7 +1109,7 @@ NotesWidget.prototype.SaveCallback = function() {
              "view" : GetViewId(),
              "date" : d.getTime()},
       success: function(data,status) {},
-      error: function() { alert( "AJAX - error() : saveviewnotes" ); },
+      error: function() { alert( "AJAX - error() : saveviewnotes" ); }
       });  
   } else {
     // Save just the users notes to the notes collection.    
@@ -1126,7 +1126,7 @@ NotesWidget.prototype.SaveCallback = function() {
                  "db"  : GetSessionDatabase(),
                  "date": d.getTime()},
           success: function(data,status) { note.Id = data;},
-          error: function() { alert( "AJAX - error(): saveusernote" ); },
+          error: function() { alert( "AJAX - error(): saveusernote" ); }
           });  
       }
     } while(iter.IsEnd());

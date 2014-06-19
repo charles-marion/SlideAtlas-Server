@@ -29,6 +29,7 @@ function PencilWidget (viewer, newFlag, showIcon, oneLineOnly) {
   this.OutlineColor = [0.9, 1.0, 0.0];
   this.TextShape = false;
   this.LineWidth = 0;
+  this.DynamicWidth = false;
   this.OneLineOnly = oneLineOnly; // It means the widget is disable when mouse up
   this.DrawnCallback = function(widget){};
   this.ActivePoint = false;  
@@ -59,9 +60,32 @@ function PencilWidget (viewer, newFlag, showIcon, oneLineOnly) {
 
 
 PencilWidget.prototype.Draw = function(view) {
-  for (var i = 0; i < this.Shapes.length; ++i) {
-    this.Shapes[i].Draw(view);
-  }
+  
+    if(this.DynamicWidth)
+      {
+      var factor = (this.Viewer.MainView.Camera.Height/this.Viewer.MainView.Viewport[3]);
+      for (var i = 0; i < this.Shapes.length; ++i) {
+          this.Shapes[i].LineWidth = factor;
+        }
+      }
+      
+    var bounds = this.GetSelectBounds();
+    var topLeft = VIEWER1.ConvertPointWorldToViewer(bounds[0][0], bounds[0][1]);
+    var bottomRight = VIEWER1.ConvertPointWorldToViewer(bounds[1][0], bounds[1][1]);
+
+    if(this.State == PENCIL_WIDGET_NEW || (bottomRight[0] - topLeft[0]) > 20) 
+      {
+      for (var i = 0; i < this.Shapes.length; ++i) {
+          this.Shapes[i].Draw(view);
+        }
+      }
+    else
+      {
+      var centerX = (bounds[1][0] - bounds[0][0])/2 + bounds[0][0];
+      var centerY = (bounds[1][1] - bounds[0][1])/2 + bounds[0][1];
+      this.Viewer.DrawSquare(centerX, centerY, this.Shapes[0].OutlineColor);
+      }
+ 
   
   if(this.TextShape != false && this.TextShape.String != "")
     {
@@ -95,7 +119,18 @@ PencilWidget.prototype.UpdatetTextPosition = function(view) {
     var scale = this.Viewer.MainView.Viewport[3] / this.Viewer.MainView.Camera.GetHeight();
     view.Context2d.font = this.TextShape.Size+'pt Calibri';
     var width = view.Context2d.measureText(this.TextShape.String).width;    
-    this.TextShape.Anchor = [width/2, -5 - scale * 10];
+    
+    var stringTemp = this.TextShape.String;
+    if(this.TextShape.String.indexOf("\n") != -1)
+      {
+      stringTemp = stringTemp.substr(0, stringTemp.indexOf("\n"));    
+      }  
+    var width = view.Context2d.measureText(stringTemp).width;    
+    var lineNumber = (this.TextShape.String.split("\n").length - 1);      
+    var offset = 0;
+    offset -= lineNumber * 8;
+    
+    this.TextShape.Anchor = [width/2, offset -5 - scale * 10];
     this.TextShape.UpdateBuffers();
     }
 }
@@ -141,7 +176,9 @@ PencilWidget.prototype.Serialize = function() {
   obj.outlinecolor = this.OutlineColor;
   obj.shapes = [];
   obj.linewidth = this.LineWidth;
-  for (var i = 0; i < this.Shapes.length; ++i) {
+  obj.dynamicwidth = this.DynamicWidth;
+  for (var i = 0; i < this.Shapes.length; ++i) {   
+    
     var shape = this.Shapes[i];
     var points = [];
     for (var j = 0; j < shape.Points.length; ++j) {
@@ -173,6 +210,7 @@ PencilWidget.prototype.ApplyColor = function(color) {
 // Load a widget from a json object (origin MongoDB).
 PencilWidget.prototype.Load = function(obj) {
   this.OutlineColor = obj.outlinecolor
+  this.DynamicWidth = obj.dynamicwidth;
   for(var n=0; n < obj.shapes.length; n++){
     var points = obj.shapes[n];
     var shape = new Polyline();

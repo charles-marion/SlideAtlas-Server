@@ -41,6 +41,8 @@ function RectangleWidget (viewer, newFlag) {
   this.Shape.Points[1] = [0,0];
   this.Shape.Points[2] = [50*cam.Height/viewport[3], 50*cam.Height/viewport[3]];
   
+  this.Shape.DynamicWidth = false;
+  
   this.TextShape = false;
   
   this.DrawnCallback = function(widget){};
@@ -61,7 +63,28 @@ function RectangleWidget (viewer, newFlag) {
 }
 
 RectangleWidget.prototype.Draw = function(view) {
-  this.Shape.Draw(view);
+  
+  var defaultWidth = this.Shape.LineWidth;
+  if(this.Shape.DynamicWidth)
+    {
+    var factor = (this.Viewer.MainView.Camera.Height/this.Viewer.MainView.Viewport[3]);
+    this.Shape.LineWidth = this.Shape.LineWidth * factor/defaultWidth;
+    }
+      
+  var bounds = this.GetSelectBounds();
+  var topLeft = VIEWER1.ConvertPointWorldToViewer(bounds[0][0], bounds[0][1]);
+  var bottomRight = VIEWER1.ConvertPointWorldToViewer(bounds[1][0], bounds[1][1]);
+  
+  if(this.State == RECTANGLE_WIDGET_NEW || this.State == RECTANGLE_WIDGET_NEW_FACE  || (bottomRight[0] - topLeft[0]) > 20) 
+    {
+    this.Shape.Draw(view);
+    }
+  else
+    {
+    var centerX = (bounds[1][0] - bounds[0][0])/2 + bounds[0][0];
+    var centerY = (bounds[1][1] - bounds[0][1])/2 + bounds[0][1];
+    this.Viewer.DrawSquare(centerX, centerY, this.Shape.OutlineColor);
+    }
   
   // draw cross middle if editable
   if(this.Viewer.AnnotationEditable && Math.abs(this.Shape.Points[0][0] - this.Shape.Points[1][0]) > 3* this.MiddleCrossOffset)
@@ -101,6 +124,8 @@ RectangleWidget.prototype.Draw = function(view) {
     this.TextShape.Draw(view);
     this.TextShape = false;
     }
+    
+  this.Shape.LineWidth = defaultWidth;
 }
 
 RectangleWidget.prototype.GetSelectBounds = function() {
@@ -129,8 +154,18 @@ RectangleWidget.prototype.UpdatetTextPosition = function(view) {
     this.TextShape.Position[1] = this.Shape.Points[2][1]; 
     var scale = this.Viewer.MainView.Viewport[3] / this.Viewer.MainView.Camera.GetHeight();
     view.Context2d.font = this.TextShape.Size+'pt Calibri';
-    var width = view.Context2d.measureText(this.TextShape.String).width;    
-    this.TextShape.Anchor = [width/2, -5 - (scale * this.Shape.LineWidth)/2];
+    
+    var stringTemp = this.TextShape.String;
+    if(this.TextShape.String.indexOf("\n") != -1)
+      {
+      stringTemp = stringTemp.substr(0, stringTemp.indexOf("\n"));    
+      }
+      
+    var lineNumber = (this.TextShape.String.split("\n").length - 1);
+    var width = view.Context2d.measureText(stringTemp).width ;     
+    var offset = 0;
+    offset -= lineNumber * 8;
+    this.TextShape.Anchor = [width/2, offset -5 - (scale * this.Shape.LineWidth)/2];
     this.TextShape.UpdateBuffers();
     }
 }
@@ -237,6 +272,7 @@ RectangleWidget.prototype.Serialize = function() {
   obj.outlinecolor = this.Shape.OutlineColor;
   obj.linewidth = this.Shape.LineWidth;
   obj.test = "";
+  obj.dynamicwidth = this.Shape.DynamicWidth;
   if(this.TextShape != false && this.TextShape.String != "")
     {
     obj.text = this.TextShape.String;
@@ -258,6 +294,7 @@ RectangleWidget.prototype.Load = function(obj) {
   this.Shape.OutlineColor[2] = parseFloat(obj.outlinecolor[2]);
   this.Shape.LineWidth = parseFloat(obj.linewidth);  
   this.CreatePointArray(obj.points[0], obj.points[2]); 
+  this.Shape.DynamicWidth = obj.dynamicwidth;
   this.ClosedLoop = (obj.closedloop == "true");
 }
 

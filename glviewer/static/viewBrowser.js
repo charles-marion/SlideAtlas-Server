@@ -125,7 +125,7 @@ function ViewBrowserImageCallback(obj) {
            "viewid": $(obj).attr('viewid'),
            "db"  : $(obj).attr('db')},
     success: function(data,status) { ViewBrowserLoadImage(data);},
-    error: function() { alert( "AJAX - error() : getview (browser)" ); },
+    error: function() { alert( "AJAX - error() : getview (browser)" ); }
   });  
 }
 

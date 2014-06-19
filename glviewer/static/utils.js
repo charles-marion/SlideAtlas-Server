@@ -63,6 +63,7 @@ function setActiveWidget(type, lineWidth)
     var widget = new CircleWidget(VIEWER1, true);
     widget.EnableWidgetPopup(false);
     widget.Shape.LineWidth = lineWidth;
+    widget.Shape.DynamicWidth = true;
     VIEWER1.ActiveWidget = widget;
     VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);
     }
@@ -70,6 +71,7 @@ function setActiveWidget(type, lineWidth)
     {
     var widget = new RectangleWidget(VIEWER1, true);
     widget.Shape.LineWidth = lineWidth;
+    widget.Shape.DynamicWidth = true;
     VIEWER1.ActiveWidget = widget;
     VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);
     }
@@ -83,6 +85,7 @@ function setActiveWidget(type, lineWidth)
     {
     var widget = new PencilWidget(VIEWER1, true, false, true);
     widget.LineWidth = lineWidth;
+    widget.DynamicWidth = true;
     VIEWER1.ActiveWidget = widget;
     VIEWER1.ActiveWidget.SetOutlineColor(color);
     }
@@ -90,6 +93,7 @@ function setActiveWidget(type, lineWidth)
     {
     var widget = new PolylineWidget(VIEWER1, true, true); 
     widget.Shape.LineWidth = lineWidth;
+    widget.Shape.DynamicWidth = true;
     VIEWER1.ActiveWidget = widget;
     VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);
     }

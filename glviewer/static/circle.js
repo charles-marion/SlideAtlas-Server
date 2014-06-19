@@ -18,12 +18,7 @@ Circle.prototype.UpdateBuffers = function() {
   this.PointBuffer = [];
   var cellData = [];
   var lineCellData = [];
-  var numEdges = Math.floor(this.Radius/2)+10;
-  // NOTE: numEdges logic will not work in world coordinates.
-  // Limit numEdges to 180 to mitigate this issue.
-  if (numEdges > 50 || ! this.FixedSize ) {
-    numEdges = 50;
-  }
+  var numEdges = 360;
 
   this.Matrix = mat4.create();
   mat4.identity(this.Matrix);

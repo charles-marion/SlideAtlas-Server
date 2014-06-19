@@ -10,7 +10,7 @@ function Shape() {
   this.LineWidth = 0; // Line width has to be in same coordiantes as points.
   this.Visibility = true; // An easy way to turn off a shape (with removing it from the shapeList).
   this.Active = false;
-  this.ActiveColor = [1.0, 1.0, 0.0];
+  this.ActiveColor = [0.70, 0.9, 0.33];
   // Playing around with layering.  The anchor is being obscured by the text.
   this.ZOffset = 0.1;
   };

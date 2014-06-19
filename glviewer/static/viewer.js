@@ -478,6 +478,18 @@ Viewer.prototype.DegToRad = function(degrees) {
   return degrees * Math.PI / 180;
 }
 
+Viewer.prototype.DrawSquare = function(x, y, color){
+   if ( !GL) {
+    this.MainView.Context2d.fillStyle = ConvertColorToHex(color);
+    var pt = this.ConvertPointViewerToWorld(0, 0);
+    var pt1 = this.ConvertPointViewerToWorld(6, 6);   
+    var size = Math.abs(pt1[0] - pt[0]);
+    
+    this.MainView.Context2d.fillRect(x-size/2, y-size/2, size, size);
+    this.MainView.Context2d.stroke();    
+   }
+  
+}
 
 Viewer.prototype.Draw = function() {
   // connectome
@@ -510,7 +522,6 @@ Viewer.prototype.Draw = function() {
     for(i in this.WidgetList){
       this.WidgetList[i].Draw(this.MainView, this.AnnotationVisibility);
     }
-
     
     if(this.SelectedWidget != null)
       {

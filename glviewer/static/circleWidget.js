@@ -35,6 +35,7 @@ function CircleWidget (viewer, newFlag) {
   this.Shape.Radius = 50*cam.Height/viewport[3];
   this.Shape.LineWidth =  5.0*cam.Height/viewport[3];
   this.Shape.FixedSize = false;
+  this.Shape.DynamicWidth = false;
   
   this.TextShape = false;
   this.DrawnCallback = function(widget){};
@@ -54,7 +55,28 @@ function CircleWidget (viewer, newFlag) {
 }
 
 CircleWidget.prototype.Draw = function(view) {
-   this.Shape.Draw(view);
+
+    var defaultWidth = this.Shape.LineWidth;
+    if(this.Shape.DynamicWidth)
+      {
+      var factor = (this.Viewer.MainView.Camera.Height/this.Viewer.MainView.Viewport[3]);
+      this.Shape.LineWidth = this.Shape.LineWidth * factor/defaultWidth;
+      }
+    
+    var bounds = this.GetSelectBounds();
+    var topLeft = VIEWER1.ConvertPointWorldToViewer(bounds[0][0], bounds[0][1]);
+    var bottomRight = VIEWER1.ConvertPointWorldToViewer(bounds[1][0], bounds[1][1]);
+
+    if(this.State == CIRCLE_WIDGET_NEW || this.State == CIRCLE_WIDGET_DRAG || this.State == CIRCLE_WIDGET_DRAG_RADIUS || (bottomRight[0] - topLeft[0]) > 20) 
+      {
+      this.Shape.Draw(view);
+      }
+    else
+      {
+      var centerX = (bounds[1][0] - bounds[0][0])/2 + bounds[0][0];
+      var centerY = (bounds[1][1] - bounds[0][1])/2 + bounds[0][1];
+      this.Viewer.DrawSquare(centerX, centerY, this.Shape.OutlineColor);
+      }
    
    // draw cross middle if editable
    if(this.Viewer.AnnotationEditable && this.Shape.Radius > 200)
@@ -90,6 +112,8 @@ CircleWidget.prototype.Draw = function(view) {
     this.TextShape.Draw(view);
     this.TextShape = false;
     }
+    
+   this.Shape.LineWidth = defaultWidth;
 }
 
 CircleWidget.prototype.UpdatetTextPosition = function(view) {
@@ -99,7 +123,15 @@ CircleWidget.prototype.UpdatetTextPosition = function(view) {
     var offset = -5 - this.Viewer.GetPixelsPerUnit()*this.Shape.Radius;
     var scale = this.Viewer.MainView.Viewport[3] / this.Viewer.MainView.Camera.GetHeight();
     view.Context2d.font = this.TextShape.Size+'pt Calibri';
-    var width = view.Context2d.measureText(this.TextShape.String).width;    
+    
+    var stringTemp = this.TextShape.String;
+    if(this.TextShape.String.indexOf("\n") != -1)
+      {
+      stringTemp = stringTemp.substr(0, stringTemp.indexOf("\n"));    
+      }   
+    var lineNumber = (this.TextShape.String.split("\n").length - 1);
+    var width = view.Context2d.measureText(stringTemp).width ;    
+    offset -= lineNumber * 8;
     this.TextShape.Anchor = [width/2, offset - (scale * this.Shape.LineWidth)/2];
     }
 }
@@ -147,6 +179,7 @@ CircleWidget.prototype.Serialize = function() {
   obj.outlinecolor = this.Shape.OutlineColor;
   obj.radius = this.Shape.Radius;
   obj.linewidth = this.Shape.LineWidth;
+  obj.dynamicwidth = this.Shape.DynamicWidth;
   if(this.TextShape != false && this.TextShape.String != "")
     {
     obj.text = this.TextShape.String;
@@ -163,6 +196,7 @@ CircleWidget.prototype.Load = function(obj) {
   this.Shape.OutlineColor[2] = parseFloat(obj.outlinecolor[2]);
   this.Shape.Radius = parseFloat(obj.radius);
   this.Shape.LineWidth = parseFloat(obj.linewidth);
+  this.Shape.DynamicWidth = obj.dynamicwidth;
   this.Shape.FixedSize = false;
   this.Shape.UpdateBuffers();
 }

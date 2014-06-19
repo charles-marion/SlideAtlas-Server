@@ -214,19 +214,24 @@ Text.prototype.Draw = function (view) {
     ctx.save();
     ctx.setTransform(1,0,0,1,0,0);
     ctx.font = this.Size+'pt Calibri';
-    ctx.shadowColor = "white";
-    ctx.shadowBlur = 2;
+    ctx.textAlign = 'center';
     
     if (this.Active) {
-      ctx.fillStyle = ConvertColorToHex([1.0,1.0,0.0]);
+      ctx.fillStyle = ConvertColorToHex([0.70, 0.9, 0.33]);
     } else {
       ctx.fillStyle = ConvertColorToHex(this.Color);
+    }
+  
+    var maxWidth = 0;
+    for (var i = 0; i < strArray.length; ++i) {
+      var lineWidth = ctx.measureText(strArray[i]).width;
+      if (lineWidth > maxWidth) { maxWidth = lineWidth; }     
     }
 
     for (var i = 0; i < strArray.length; ++i) {
       var lineWidth = ctx.measureText(strArray[i]).width;
-      if (lineWidth > width) { width = lineWidth; }      
-      ctx.fillText(strArray[i], x, y + this.Size*i);
+      if (lineWidth > width) { width = lineWidth; }     
+      ctx.fillText(strArray[i], x + maxWidth/2, y + this.Size*i);
     }
     this.PixelBounds = [0, width, -height+this.Size, this.Size];
     ctx.restore();

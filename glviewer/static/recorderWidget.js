@@ -253,7 +253,7 @@ function RecordState() {
       success: function(data,status){
          //alert(data + "\nStatus: " + status);
          },
-      error: function() { alert( "AJAX - error()" ); },
+      error: function() { alert( "AJAX - error()" ); }
       });
   }
 }

@@ -27,6 +27,7 @@ function PolylineWidget (viewer, newFlag, oneLineOnly) {
   var viewport = viewer.MainView.Viewport;
 
   this.Viewer = viewer;
+  this.IsClicked = false;
   // If the last point is the same as the first point, ClosedLoop is true.
   this.ClosedLoop = false;
   // Circle is to show an active vertex.
@@ -47,6 +48,7 @@ function PolylineWidget (viewer, newFlag, oneLineOnly) {
   this.Shape = new Polyline();
 	this.Shape.OutlineColor = [0.0, 0.0, 0.0];
   this.Shape.FixedSize = false;
+  this.Shape.DynamicWidth = false;
 
   this.Viewer.WidgetList.push(this);
   
@@ -71,6 +73,12 @@ function PolylineWidget (viewer, newFlag, oneLineOnly) {
 }
 
 PolylineWidget.prototype.Draw = function(view) {
+    var defaultWidth = this.Shape.LineWidth;
+    if(this.Shape.DynamicWidth)
+      {
+      var factor = (this.Viewer.MainView.Camera.Height/this.Viewer.MainView.Viewport[3]);
+      this.Shape.LineWidth = factor;
+      }
     this.Shape.Draw(view);
     this.Circle.Draw(view);
     if(this.RulerShape != false && this.RulerShape.String != "")
@@ -78,9 +86,12 @@ PolylineWidget.prototype.Draw = function(view) {
       this.UpdatetRulerLabelPosition(view);
       this.RulerShape.Draw(view);  
       }
+      
+    this.Shape.LineWidth = defaultWidth;
 }
 
 PolylineWidget.prototype.UpdatetRulerLabelPosition = function(view) {
+  
   if(this.RulerShape != false && this.RulerShape.String != "")
     {    
     var bounds = this.GetSelectBounds()
@@ -89,6 +100,8 @@ PolylineWidget.prototype.UpdatetRulerLabelPosition = function(view) {
     var scale = this.Viewer.MainView.Viewport[3] / this.Viewer.MainView.Camera.GetHeight();
     view.Context2d.font = this.RulerShape.Size+'pt Calibri';
     var width = view.Context2d.measureText(this.RulerShape.String).width;    
+    
+    if(typeof this.Shape.Points[1] == "undefined") return;
     
     var deltaY = this.Shape.Points[1][1] - this.Shape.Points[0][1];
     var deltaX = this.Shape.Points[1][0] - this.Shape.Points[0][0];
@@ -200,6 +213,7 @@ PolylineWidget.prototype.Serialize = function() {
   }  
   obj.spacing = this.Spacing;
   obj.closedloop = this.ClosedLoop;
+  obj.dynamicwidth = this.Shape.DynamicWidth;
   return obj;
 }
 
@@ -208,6 +222,7 @@ PolylineWidget.prototype.Load = function(obj) {
   this.Shape.OutlineColor[0] = parseFloat(obj.outlinecolor[0]);
   this.Shape.OutlineColor[1] = parseFloat(obj.outlinecolor[1]);
   this.Shape.OutlineColor[2] = parseFloat(obj.outlinecolor[2]);
+  this.Shape.DynamicWidth = obj.dynamicwidth;
   this.Shape.LineWidth = parseFloat(obj.linewidth);
   for(var n=0; n < obj.points.length; n++){
       this.Shape.Points[n] = [parseFloat(obj.points[n][0]),
@@ -256,6 +271,7 @@ PolylineWidget.prototype.Deactivate = function() {
 
 // Mouse down does nothing. Mouse up causes all state changes.
 PolylineWidget.prototype.HandleMouseDown = function(event) {
+  this.IsClicked = true;
   var x = event.MouseX;
   var y = event.MouseY;
   var pt = this.Viewer.ConvertPointViewerToWorld(x,y);
@@ -313,6 +329,8 @@ PolylineWidget.prototype.SetDrawnCallback = function(callback) {
 
 // Returns false when it is finished doing its work.
 PolylineWidget.prototype.HandleMouseUp = function(event) {
+  this.IsClicked = false;
+  
   // Logic to remove a vertex.  Drag it over a neighbor.
   //if (this.State  do this later.
   
@@ -351,6 +369,8 @@ PolylineWidget.prototype.HandleMouseMove = function(event) {
   var x = event.MouseX;
   var y = event.MouseY;
   var pt = this.Viewer.ConvertPointViewerToWorld(x,y);
+  
+  console.log(event.SystemEvent.which);
 
   if (this.State == POLYLINE_WIDGET_NEW) {
     this.Circle.Origin = pt;
@@ -371,7 +391,7 @@ PolylineWidget.prototype.HandleMouseMove = function(event) {
   if (this.State == POLYLINE_WIDGET_VERTEX_ACTIVE ||
       this.State == POLYLINE_WIDGET_MIDPOINT_ACTIVE ||
       this.State == POLYLINE_WIDGET_ACTIVE) {
-    if (event.SystemEvent.which == 0) {
+    if (!this.IsClicked) {
       // Turn off the active vertex if the mouse moves away.
       this.SetActive(this.CheckActive(event));
       return;

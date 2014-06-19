@@ -34,7 +34,7 @@ function ViewBrowserSessionCallback(obj){$(obj).unbind('click');var db=$(obj).at
 function ViewBrowserAddSessionViews(sessionData){var sessionItem=$("[sessid="+sessionData.sessid+"]");var viewList=$('<ul>').appendTo(sessionItem)
 for(var i=0;i<sessionData.images.length;++i){var image=sessionData.images[i];var item=$('<li>').appendTo(viewList).attr('db',sessionData.db).attr('sessid',sessionData.sessid).attr('viewid',image.view).click(function(){ViewBrowserImageCallback(this);});$('<img>').appendTo(item).attr('src',"tile?db="+image.db+"&img="+image.img+"&name=t.jpg").css({'height':'50px'});$('<span>').appendTo(item).text(image.label);}}
 function ViewBrowserImageCallback(obj){$('#viewBrowser').hide();if(obj==null){ACTIVE_VIEWER.SetCache(null);eventuallyRender();return;}
-var db=$(obj).attr('db');var viewid=$(obj).attr('viewid');$.ajax({type:"get",url:"/webgl-viewer/getview",data:{"sessid":$(obj).attr('sessid'),"viewid":$(obj).attr('viewid'),"db":$(obj).attr('db')},success:function(data,status){ViewBrowserLoadImage(data);},error:function(){alert("AJAX - error() : getview (browser)");},});}
+var db=$(obj).attr('db');var viewid=$(obj).attr('viewid');$.ajax({type:"get",url:"/webgl-viewer/getview",data:{"sessid":$(obj).attr('sessid'),"viewid":$(obj).attr('viewid'),"db":$(obj).attr('db')},success:function(data,status){ViewBrowserLoadImage(data);},error:function(){alert("AJAX - error() : getview (browser)");}});}
 function LoadImage(viewer,viewData){ACTIVE_VIEWER=viewer;var source=new Cache(viewData);ACTIVE_VIEWER.SetCache(source);RecordState();eventuallyRender();source.SetSource(viewData['url']);if(viewData['url']instanceof Array)
 {LOADING_MAXIMUM=viewData['url'].length*4;}
 if(viewData['use_tms'])ACTIVE_VIEWER.GetCache().EnableTMSMode(true);}
@@ -94,7 +94,7 @@ function RecordingStop(){if(!RECORDING){return;}
 RECORDING=false;setCookie("SlideAtlasRecording","false",1);RecordingUpdateGUI();}
 function NewPageRecord(){stateRecord={};stateRecord.Viewers=[];var viewerRecord=new ViewerRecord();viewerRecord.CopyViewer(VIEWER1);stateRecord.Viewers.push(viewerRecord);if(DUAL_VIEW){viewerRecord=new ViewerRecord();viewerRecord.CopyViewer(VIEWER2);stateRecord.Viewers.push(viewerRecord);}
 return stateRecord;}
-function RecordState(){REDO_STACK=[];var pageRecord=NewPageRecord();var d=new Date();pageRecord.Time=d.getTime();TIME_LINE.push(pageRecord);if(RECORDING){$.ajax({type:"post",url:"/webgl-viewer/record-save",data:{"record":JSON.stringify(pageRecord),"name":RECORDING_NAME,"db":SESSION_DB,"date":d.getTime()},success:function(data,status){},error:function(){alert("AJAX - error()");},});}}
+function RecordState(){REDO_STACK=[];var pageRecord=NewPageRecord();var d=new Date();pageRecord.Time=d.getTime();TIME_LINE.push(pageRecord);if(RECORDING){$.ajax({type:"post",url:"/webgl-viewer/record-save",data:{"record":JSON.stringify(pageRecord),"name":RECORDING_NAME,"db":SESSION_DB,"date":d.getTime()},success:function(data,status){},error:function(){alert("AJAX - error()");}});}}
 function UndoState(){if(TIME_LINE.length>1){var record=TIME_LINE.pop();REDO_STACK.push(record);record=TIME_LINE[TIME_LINE.length-1];SetNumberOfViews(record.Viewers.length);record.Viewers[0].Apply(VIEWER1);if(record.Viewers.length>1){record.Viewers[1].Apply(VIEWER2);}}}
 function RedoState(){if(REDO_STACK.length==0){return;}
 var record=REDO_STACK.pop();TIME_LINE.push(record);SetNumberOfViews(record.Viewers.length);record.Viewers[0].Apply(VIEWER1);if(record.Viewers.length>1){record.Viewers[1].Apply(VIEWER2);}}
@@ -185,7 +185,7 @@ var width=(100*LOAD_QUEUE.length/LOAD_PROGRESS_MAX).toFixed();width=width+"%";PR
 function LoadQueueLoaded(tile){--LOADING_COUNT;tile.LoadState=3;LoadQueueUpdate();}
 function LoadQueueError(tile){tile.LoadState=4;--LOADING_COUNT;LoadQueueUpdate();}
 function Camera(viewportWidth,viewportHeight){this.ZRange=[-1.0,1.0];this.Roll=0;this.Matrix=mat4.create();this.ViewportWidth=viewportWidth;this.ViewportHeight=viewportHeight;this.Height=256.0*64.0;this.FocalPoint=[128.0*64.0,128.0*64.0,10.0];this.ComputeMatrix();this.Points=[];this.Buffer=null;this.CreateBuffer();this.Mirror=false;}
-Camera.prototype.SetViewport=function(viewport){if(10*viewport[3]<viewport[2]){alert("Unusual viewport "+viewport[3]);return;}
+Camera.prototype.SetViewport=function(viewport){if(10*viewport[3]<viewport[2]){return;}
 this.ViewportWidth=viewport[2];this.ViewportHeight=viewport[3];}
 Camera.prototype.GetRotation=function(){return this.Roll*180.0/3.1415926535;}
 Camera.prototype.GetFocalPoint=function(){return[this.FocalPoint[0],this.FocalPoint[1],this.FocalPoint[2]];}
@@ -430,6 +430,7 @@ Viewer.prototype.DeactivateWidget=function(widget){if(this.ActiveWidget!=widget|
 this.ActiveWidget=null;}
 Viewer.prototype.SetSelectedWidget=function(widget){this.SelectedWidget=widget;}
 Viewer.prototype.DegToRad=function(degrees){return degrees*Math.PI/180;}
+Viewer.prototype.DrawSquare=function(x,y,color){if(!GL){this.MainView.Context2d.fillStyle=ConvertColorToHex(color);var pt=this.ConvertPointViewerToWorld(0,0);var pt1=this.ConvertPointViewerToWorld(6,6);var size=Math.abs(pt1[0]-pt[0]);this.MainView.Context2d.fillRect(x-size/2,y-size/2,size,size);this.MainView.Context2d.stroke();}}
 Viewer.prototype.Draw=function(){if(!this.MainView.Section){return;}
 this.ConstrainCamera();if(GL){GL.disable(GL.BLEND);GL.enable(GL.DEPTH_TEST);}
 this.MainView.DrawTiles();this.MainView.DrawOutline(false);if(this.OverView){this.OverView.DrawTiles();this.OverView.DrawOutline(true);}
@@ -593,9 +594,15 @@ function ArrowPropertyDialogCancel(){var widget=ARROW_WIDGET_DIALOG_SELF;if(widg
 function ArrowPropertyDialogDelete(){var widget=ARROW_WIDGET_DIALOG_SELF;if(widget!=null){viewer.ActiveWidget=null;widget.RemoveFromViewer();eventuallyRender();}}
 var CIRCLE_WIDGET_NEW=0;var CIRCLE_WIDGET_DRAG=1;var CIRCLE_WIDGET_DRAG_RADIUS=2;var CIRCLE_WIDGET_WAITING=3;var CIRCLE_WIDGET_ACTIVE=4;var CIRCLE_WIDGET_PROPERTIES_DIALOG=5;function CircleWidget(viewer,newFlag){this.Tolerance=0.05;if(MOBILE_DEVICE){this.Tolerance=0.1;}
 if(viewer==null){return;}
-this.Popup=new WidgetPopup(this);this.ShowPopup=true;this.Viewer=viewer;this.IsTextActive=false;this.IsShapeUpdate=false;this.MiddleCrossOffset=100;var cam=viewer.MainView.Camera;var viewport=viewer.MainView.Viewport;this.Shape=new Circle();this.Shape.Origin=[0,0];this.Shape.OutlineColor=[0.0,0.0,0.0];this.Shape.Radius=50*cam.Height/viewport[3];this.Shape.LineWidth=5.0*cam.Height/viewport[3];this.Shape.FixedSize=false;this.TextShape=false;this.DrawnCallback=function(widget){};this.Viewer.WidgetList.push(this);if(newFlag){this.State=CIRCLE_WIDGET_NEW;this.Viewer.ActivateWidget(this);return;}
+this.Popup=new WidgetPopup(this);this.ShowPopup=true;this.Viewer=viewer;this.IsTextActive=false;this.IsShapeUpdate=false;this.MiddleCrossOffset=100;var cam=viewer.MainView.Camera;var viewport=viewer.MainView.Viewport;this.Shape=new Circle();this.Shape.Origin=[0,0];this.Shape.OutlineColor=[0.0,0.0,0.0];this.Shape.Radius=50*cam.Height/viewport[3];this.Shape.LineWidth=5.0*cam.Height/viewport[3];this.Shape.FixedSize=false;this.Shape.DynamicWidth=false;this.TextShape=false;this.DrawnCallback=function(widget){};this.Viewer.WidgetList.push(this);if(newFlag){this.State=CIRCLE_WIDGET_NEW;this.Viewer.ActivateWidget(this);return;}
 this.State=CIRCLE_WIDGET_WAITING;}
-CircleWidget.prototype.Draw=function(view){this.Shape.Draw(view);if(this.Viewer.AnnotationEditable&&this.Shape.Radius>200)
+CircleWidget.prototype.Draw=function(view){var defaultWidth=this.Shape.LineWidth;if(this.Shape.DynamicWidth)
+{var factor=(this.Viewer.MainView.Camera.Height/this.Viewer.MainView.Viewport[3]);this.Shape.LineWidth=this.Shape.LineWidth*factor/defaultWidth;}
+var bounds=this.GetSelectBounds();var topLeft=VIEWER1.ConvertPointWorldToViewer(bounds[0][0],bounds[0][1]);var bottomRight=VIEWER1.ConvertPointWorldToViewer(bounds[1][0],bounds[1][1]);if(this.State==CIRCLE_WIDGET_NEW||this.State==CIRCLE_WIDGET_DRAG||this.State==CIRCLE_WIDGET_DRAG_RADIUS||(bottomRight[0]-topLeft[0])>20)
+{this.Shape.Draw(view);}
+else
+{var centerX=(bounds[1][0]-bounds[0][0])/2+bounds[0][0];var centerY=(bounds[1][1]-bounds[0][1])/2+bounds[0][1];this.Viewer.DrawSquare(centerX,centerY,this.Shape.OutlineColor);}
+if(this.Viewer.AnnotationEditable&&this.Shape.Radius>200)
 {var vertical=new Polyline();vertical.OutlineColor=[0.6,0.6,0.6];vertical.FixedSize=false;vertical.Points=[];vertical.Points.push([this.Shape.Origin[0]-this.MiddleCrossOffset,this.Shape.Origin[1]]);vertical.Points.push([this.Shape.Origin[0]+this.MiddleCrossOffset,this.Shape.Origin[1]]);vertical.UpdateBuffers();vertical.Draw(view)
 var horizontal=new Polyline();horizontal.OutlineColor=[0.6,0.6,0.6];horizontal.FixedSize=false;horizontal.Points=[];horizontal.Points.push([this.Shape.Origin[0],this.Shape.Origin[1]-this.MiddleCrossOffset]);horizontal.Points.push([this.Shape.Origin[0],this.Shape.Origin[1]+this.MiddleCrossOffset]);horizontal.UpdateBuffers();horizontal.Draw(view)}
 if(this.TextShape!=false&&this.TextShape.String!="")
@@ -603,9 +610,12 @@ if(this.TextShape!=false&&this.TextShape.String!="")
 this.TextShape.Draw(view);}
 else if(this.Viewer.AnnotationEditable)
 {this.SetText("Add Label",12)
-this.TextShape.Color=[0.6,0.6,0.6];this.UpdatetTextPosition(view);this.TextShape.Draw(view);this.TextShape=false;}}
+this.TextShape.Color=[0.6,0.6,0.6];this.UpdatetTextPosition(view);this.TextShape.Draw(view);this.TextShape=false;}
+this.Shape.LineWidth=defaultWidth;}
 CircleWidget.prototype.UpdatetTextPosition=function(view){if(this.TextShape!=false&&this.TextShape.String!="")
-{this.TextShape.Position=this.Shape.Origin;var offset=-5-this.Viewer.GetPixelsPerUnit()*this.Shape.Radius;var scale=this.Viewer.MainView.Viewport[3]/this.Viewer.MainView.Camera.GetHeight();view.Context2d.font=this.TextShape.Size+'pt Calibri';var width=view.Context2d.measureText(this.TextShape.String).width;this.TextShape.Anchor=[width/2,offset-(scale*this.Shape.LineWidth)/2];}}
+{this.TextShape.Position=this.Shape.Origin;var offset=-5-this.Viewer.GetPixelsPerUnit()*this.Shape.Radius;var scale=this.Viewer.MainView.Viewport[3]/this.Viewer.MainView.Camera.GetHeight();view.Context2d.font=this.TextShape.Size+'pt Calibri';var stringTemp=this.TextShape.String;if(this.TextShape.String.indexOf("\n")!=-1)
+{stringTemp=stringTemp.substr(0,stringTemp.indexOf("\n"));}
+var lineNumber=(this.TextShape.String.split("\n").length-1);var width=view.Context2d.measureText(stringTemp).width;offset-=lineNumber*8;this.TextShape.Anchor=[width/2,offset-(scale*this.Shape.LineWidth)/2];}}
 CircleWidget.prototype.GetSelectBounds=function(){var offset=this.Shape.Radius;var pt1=[this.Shape.Origin[0]-offset,this.Shape.Origin[1]+offset];var pt2=[this.Shape.Origin[0]+offset,this.Shape.Origin[1]-offset];return[pt1,pt2];}
 CircleWidget.prototype.SetDrawnCallback=function(callback){this.DrawnCallback=callback;}
 CircleWidget.prototype.EnableWidgetPopup=function(enable){this.ShowPopup=(enable==1||enable);}
@@ -613,10 +623,10 @@ CircleWidget.prototype.SetText=function(text,height){this.TextShape=new Text();t
 CircleWidget.prototype.RemoveFromViewer=function(){if(this.Viewer==null){return;}
 var idx=this.Viewer.WidgetList.indexOf(this);if(idx!=-1){this.Viewer.WidgetList.splice(idx,1);}}
 CircleWidget.prototype.Serialize=function(){if(this.Shape===undefined){return null;}
-var obj=new Object();obj.type="circle";obj.origin=this.Shape.Origin;obj.outlinecolor=this.Shape.OutlineColor;obj.radius=this.Shape.Radius;obj.linewidth=this.Shape.LineWidth;if(this.TextShape!=false&&this.TextShape.String!="")
+var obj=new Object();obj.type="circle";obj.origin=this.Shape.Origin;obj.outlinecolor=this.Shape.OutlineColor;obj.radius=this.Shape.Radius;obj.linewidth=this.Shape.LineWidth;obj.dynamicwidth=this.Shape.DynamicWidth;if(this.TextShape!=false&&this.TextShape.String!="")
 {obj.text=this.TextShape.String;}
 return obj;}
-CircleWidget.prototype.Load=function(obj){this.Shape.Origin[0]=parseFloat(obj.origin[0]);this.Shape.Origin[1]=parseFloat(obj.origin[1]);this.Shape.OutlineColor[0]=parseFloat(obj.outlinecolor[0]);this.Shape.OutlineColor[1]=parseFloat(obj.outlinecolor[1]);this.Shape.OutlineColor[2]=parseFloat(obj.outlinecolor[2]);this.Shape.Radius=parseFloat(obj.radius);this.Shape.LineWidth=parseFloat(obj.linewidth);this.Shape.FixedSize=false;this.Shape.UpdateBuffers();}
+CircleWidget.prototype.Load=function(obj){this.Shape.Origin[0]=parseFloat(obj.origin[0]);this.Shape.Origin[1]=parseFloat(obj.origin[1]);this.Shape.OutlineColor[0]=parseFloat(obj.outlinecolor[0]);this.Shape.OutlineColor[1]=parseFloat(obj.outlinecolor[1]);this.Shape.OutlineColor[2]=parseFloat(obj.outlinecolor[2]);this.Shape.Radius=parseFloat(obj.radius);this.Shape.LineWidth=parseFloat(obj.linewidth);this.Shape.DynamicWidth=obj.dynamicwidth;this.Shape.FixedSize=false;this.Shape.UpdateBuffers();}
 CircleWidget.prototype.HandleKeyPress=function(keyCode,shift){}
 CircleWidget.prototype.HandleDoubleClick=function(event){}
 CircleWidget.prototype.HandleMouseDown=function(event){if(event.SystemEvent.which!=1)
@@ -711,13 +721,16 @@ var hexcolor=document.getElementById("textcolor").value;var markerFlag=document.
 function TextPropertyDialogCancel(){var widget=TEXT_WIDGET_DIALOG_SELF;if(widget!=null){widget.SetActive(false);}}
 function TextPropertyDialogDelete(){var widget=TEXT_WIDGET_DIALOG_SELF;if(widget!=null){widget.SetActive(false);widget.RemoveFromViewer();eventuallyRender();RecordState();}}
 var POLYLINE_WIDGET_NEW=0;var POLYLINE_WIDGET_NEW_EDGE=1;var POLYLINE_WIDGET_WAITING=2;var POLYLINE_WIDGET_VERTEX_ACTIVE=3;var POLYLINE_WIDGET_MIDPOINT_ACTIVE=4;var POLYLINE_WIDGET_ACTIVE=5;var POLYLINE_WIDGET_PROPERTIES_DIALOG=6;function PolylineWidget(viewer,newFlag,oneLineOnly){if(viewer===undefined){return;}
-if(typeof oneLineOnly=="undefined")oneLineOnly=false;var cam=viewer.MainView.Camera;var viewport=viewer.MainView.Viewport;this.Viewer=viewer;this.ClosedLoop=false;this.Circle=new Circle();this.Circle.FillColor=[1.0,1.0,0.2];this.Circle.OutlineColor=[0.0,0.0,0.0];this.Circle.FixedSize=false;this.Circle.ZOffset=-0.05;this.Spacing=false;this.RulerShape=false;this.OneLineOnly=oneLineOnly;this.IsShapeUpdate=false;this.DrawnCallback=function(widget){};this.Shape=new Polyline();this.Shape.OutlineColor=[0.0,0.0,0.0];this.Shape.FixedSize=false;this.Viewer.WidgetList.push(this);this.Shape.LineWidth=5.0*cam.Height/viewport[3];this.Circle.Radius=this.Shape.LineWidth;this.Circle.UpdateBuffers();if(newFlag){this.Viewer.SetCursor("crosshair");this.State=POLYLINE_WIDGET_NEW;this.Shape.Active=true;this.ActiveVertex=-1;this.Viewer.ActivateWidget(this);}else{this.State=POLYLINE_WIDGET_WAITING;this.Circle.Visibility=false;this.ActiveVertex==-1;}
+if(typeof oneLineOnly=="undefined")oneLineOnly=false;var cam=viewer.MainView.Camera;var viewport=viewer.MainView.Viewport;this.Viewer=viewer;this.IsClicked=false;this.ClosedLoop=false;this.Circle=new Circle();this.Circle.FillColor=[1.0,1.0,0.2];this.Circle.OutlineColor=[0.0,0.0,0.0];this.Circle.FixedSize=false;this.Circle.ZOffset=-0.05;this.Spacing=false;this.RulerShape=false;this.OneLineOnly=oneLineOnly;this.IsShapeUpdate=false;this.DrawnCallback=function(widget){};this.Shape=new Polyline();this.Shape.OutlineColor=[0.0,0.0,0.0];this.Shape.FixedSize=false;this.Shape.DynamicWidth=false;this.Viewer.WidgetList.push(this);this.Shape.LineWidth=5.0*cam.Height/viewport[3];this.Circle.Radius=this.Shape.LineWidth;this.Circle.UpdateBuffers();if(newFlag){this.Viewer.SetCursor("crosshair");this.State=POLYLINE_WIDGET_NEW;this.Shape.Active=true;this.ActiveVertex=-1;this.Viewer.ActivateWidget(this);}else{this.State=POLYLINE_WIDGET_WAITING;this.Circle.Visibility=false;this.ActiveVertex==-1;}
 this.ActiveMidpoint=-1;eventuallyRender();}
-PolylineWidget.prototype.Draw=function(view){this.Shape.Draw(view);this.Circle.Draw(view);if(this.RulerShape!=false&&this.RulerShape.String!="")
-{this.UpdatetRulerLabelPosition(view);this.RulerShape.Draw(view);}}
+PolylineWidget.prototype.Draw=function(view){var defaultWidth=this.Shape.LineWidth;if(this.Shape.DynamicWidth)
+{var factor=(this.Viewer.MainView.Camera.Height/this.Viewer.MainView.Viewport[3]);this.Shape.LineWidth=factor;}
+this.Shape.Draw(view);this.Circle.Draw(view);if(this.RulerShape!=false&&this.RulerShape.String!="")
+{this.UpdatetRulerLabelPosition(view);this.RulerShape.Draw(view);}
+this.Shape.LineWidth=defaultWidth;}
 PolylineWidget.prototype.UpdatetRulerLabelPosition=function(view){if(this.RulerShape!=false&&this.RulerShape.String!="")
 {var bounds=this.GetSelectBounds()
-this.RulerShape.Position[0]=bounds[0][0]+(bounds[1][0]-bounds[0][0])/2;this.RulerShape.Position[1]=bounds[1][1];var scale=this.Viewer.MainView.Viewport[3]/this.Viewer.MainView.Camera.GetHeight();view.Context2d.font=this.RulerShape.Size+'pt Calibri';var width=view.Context2d.measureText(this.RulerShape.String).width;var deltaY=this.Shape.Points[1][1]-this.Shape.Points[0][1];var deltaX=this.Shape.Points[1][0]-this.Shape.Points[0][0];if(Math.abs(deltaY)>30/this.Viewer.GetPixelsPerUnit())
+this.RulerShape.Position[0]=bounds[0][0]+(bounds[1][0]-bounds[0][0])/2;this.RulerShape.Position[1]=bounds[1][1];var scale=this.Viewer.MainView.Viewport[3]/this.Viewer.MainView.Camera.GetHeight();view.Context2d.font=this.RulerShape.Size+'pt Calibri';var width=view.Context2d.measureText(this.RulerShape.String).width;if(typeof this.Shape.Points[1]=="undefined")return;var deltaY=this.Shape.Points[1][1]-this.Shape.Points[0][1];var deltaX=this.Shape.Points[1][0]-this.Shape.Points[0][0];if(Math.abs(deltaY)>30/this.Viewer.GetPixelsPerUnit())
 {if(deltaY>0&&deltaX>0||deltaY<0&&deltaX<0)
 {this.RulerShape.Position[0]=bounds[0][0]+(bounds[1][0]-bounds[0][0])/2;this.RulerShape.Position[1]=bounds[1][1]-(bounds[1][1]-bounds[0][1])/2;this.RulerShape.Anchor=[-width/2,0];}
 else
@@ -744,8 +757,8 @@ if(y2==false||y>y2)
 return[[x1,y1],[x2,y2]];}
 PolylineWidget.prototype.Serialize=function(){if(this.Shape===undefined){return null;}
 var obj=new Object();obj.type="polyline";obj.outlinecolor=this.Shape.OutlineColor;obj.linewidth=this.Shape.LineWidth;obj.points=[];for(var i=0;i<this.Shape.Points.length;++i){obj.points.push([this.Shape.Points[i][0],this.Shape.Points[i][1]]);}
-obj.spacing=this.Spacing;obj.closedloop=this.ClosedLoop;return obj;}
-PolylineWidget.prototype.Load=function(obj){this.Shape.OutlineColor[0]=parseFloat(obj.outlinecolor[0]);this.Shape.OutlineColor[1]=parseFloat(obj.outlinecolor[1]);this.Shape.OutlineColor[2]=parseFloat(obj.outlinecolor[2]);this.Shape.LineWidth=parseFloat(obj.linewidth);for(var n=0;n<obj.points.length;n++){this.Shape.Points[n]=[parseFloat(obj.points[n][0]),parseFloat(obj.points[n][1])];}
+obj.spacing=this.Spacing;obj.closedloop=this.ClosedLoop;obj.dynamicwidth=this.Shape.DynamicWidth;return obj;}
+PolylineWidget.prototype.Load=function(obj){this.Shape.OutlineColor[0]=parseFloat(obj.outlinecolor[0]);this.Shape.OutlineColor[1]=parseFloat(obj.outlinecolor[1]);this.Shape.OutlineColor[2]=parseFloat(obj.outlinecolor[2]);this.Shape.DynamicWidth=obj.dynamicwidth;this.Shape.LineWidth=parseFloat(obj.linewidth);for(var n=0;n<obj.points.length;n++){this.Shape.Points[n]=[parseFloat(obj.points[n][0]),parseFloat(obj.points[n][1])];}
 this.ClosedLoop=(obj.closedloop=="true");if(obj.spacing!="false")
 {this.OneLineOnly=true;this.ShowRuler(obj.spacing)}
 this.Shape.UpdateBuffers();}
@@ -755,23 +768,23 @@ PolylineWidget.prototype.CityBlockDistance=function(p0,p1){return Math.abs(p1[0]
 PolylineWidget.prototype.HandleKeyPress=function(keyCode,shift){}
 PolylineWidget.prototype.HandleDoubleClick=function(event){}
 PolylineWidget.prototype.Deactivate=function(){this.State=POLYLINE_WIDGET_WAITING;this.Viewer.DeactivateWidget(this);this.Shape.Active=false;this.ActivateVertex(-1);eventuallyRender();}
-PolylineWidget.prototype.HandleMouseDown=function(event){var x=event.MouseX;var y=event.MouseY;var pt=this.Viewer.ConvertPointViewerToWorld(x,y);if(this.State==POLYLINE_WIDGET_NEW){this.Shape.Points.push(pt);this.Shape.Points.push([pt[0],pt[1]]);this.ActivateVertex(-1);this.State=POLYLINE_WIDGET_NEW_EDGE;eventuallyRender();this.IsShapeUpdate=true;return;}
+PolylineWidget.prototype.HandleMouseDown=function(event){this.IsClicked=true;var x=event.MouseX;var y=event.MouseY;var pt=this.Viewer.ConvertPointViewerToWorld(x,y);if(this.State==POLYLINE_WIDGET_NEW){this.Shape.Points.push(pt);this.Shape.Points.push([pt[0],pt[1]]);this.ActivateVertex(-1);this.State=POLYLINE_WIDGET_NEW_EDGE;eventuallyRender();this.IsShapeUpdate=true;return;}
 if(this.State==POLYLINE_WIDGET_NEW_EDGE){if(this.ActiveVertex>=0){if(this.ActiveVertex==0){this.ClosedLoop=true;}else{this.ClosedLoop=false;this.Shape.Points.pop();}
 this.Deactivate();RecordState();return;}
 this.Shape.Points.push(pt);this.Shape.UpdateBuffers();eventuallyRender();this.IsShapeUpdate=true;return;}
 if(this.State==POLYLINE_WIDGET_MIDPOINT_ACTIVE&&this.OneLineOnly==false){var x=0.5*(this.Shape.Points[this.ActiveMidpoint-1][0]+this.Shape.Points[this.ActiveMidpoint][0]);var y=0.5*(this.Shape.Points[this.ActiveMidpoint-1][1]+this.Shape.Points[this.ActiveMidpoint][1]);this.Shape.Points.splice(this.ActiveMidpoint,0,[x,y]);this.ActivateVertex(this.ActiveMidpoint);this.ActiveMidpoint=-1;this.State=POLYLINE_WIDGET_VERTEX_ACTIVE;this.IsShapeUpdate=true;}
 if(this.State==POLYLINE_WIDGET_ACTIVE){this.LastMouseWorld=pt;}}
 PolylineWidget.prototype.SetDrawnCallback=function(callback){this.DrawnCallback=callback;}
-PolylineWidget.prototype.HandleMouseUp=function(event){if(this.State==POLYLINE_WIDGET_ACTIVE&&event.SystemEvent.which==3){this.State=POLYLINE_WIDGET_PROPERTIES_DIALOG;this.ShowPropertiesDialog();}
+PolylineWidget.prototype.HandleMouseUp=function(event){this.IsClicked=false;if(this.State==POLYLINE_WIDGET_ACTIVE&&event.SystemEvent.which==3){this.State=POLYLINE_WIDGET_PROPERTIES_DIALOG;this.ShowPropertiesDialog();}
 if(event.SystemEvent.which==1){if(this.State==POLYLINE_WIDGET_NEW_EDGE){if(this.OneLineOnly)
 {this.Deactivate();}
 this.DrawnCallback(this);if(this.IsShapeUpdate)
 {this.Viewer.UpdateCallback(this);this.UpdateRuler(this.Spacing);}
 this.IsShapeUpdate=false;}
 if(this.State==POLYLINE_WIDGET_VERTEX_ACTIVE||this.State==POLYLINE_WIDGET_ACTIVE){RecordState();}}}
-PolylineWidget.prototype.HandleMouseMove=function(event){var x=event.MouseX;var y=event.MouseY;var pt=this.Viewer.ConvertPointViewerToWorld(x,y);if(this.State==POLYLINE_WIDGET_NEW){this.Circle.Origin=pt;eventuallyRender();return;}
+PolylineWidget.prototype.HandleMouseMove=function(event){var x=event.MouseX;var y=event.MouseY;var pt=this.Viewer.ConvertPointViewerToWorld(x,y);console.log(event.SystemEvent.which);if(this.State==POLYLINE_WIDGET_NEW){this.Circle.Origin=pt;eventuallyRender();return;}
 if(this.State==POLYLINE_WIDGET_NEW_EDGE){var lastIdx=this.Shape.Points.length-1;this.Shape.Points[lastIdx]=pt;this.Shape.UpdateBuffers();var idx=this.WhichVertexShouldBeActive(pt);this.ActivateVertex(idx);this.UpdateRuler(this.Spacing);eventuallyRender();return;}
-if(this.State==POLYLINE_WIDGET_VERTEX_ACTIVE||this.State==POLYLINE_WIDGET_MIDPOINT_ACTIVE||this.State==POLYLINE_WIDGET_ACTIVE){if(event.SystemEvent.which==0){this.SetActive(this.CheckActive(event));return;}
+if(this.State==POLYLINE_WIDGET_VERTEX_ACTIVE||this.State==POLYLINE_WIDGET_MIDPOINT_ACTIVE||this.State==POLYLINE_WIDGET_ACTIVE){if(!this.IsClicked){this.SetActive(this.CheckActive(event));return;}
 if(this.State==POLYLINE_WIDGET_ACTIVE&&event.SystemEvent.which==1){var dx=pt[0]-this.LastMouseWorld[0];var dy=pt[1]-this.LastMouseWorld[1];for(var i=0;i<this.Shape.Points.length;++i){this.Shape.Points[i][0]+=dx;this.Shape.Points[i][1]+=dy;}
 this.LastMouseWorld=pt;this.Shape.UpdateBuffers();eventuallyRender();return;}
 if(this.State==POLYLINE_WIDGET_VERTEX_ACTIVE&&event.SystemEvent.which==1){var last=this.Shape.Points.length-1;if(this.ClosedLoop&&(this.ActiveVertex==0||this.ActiveVertex==last)){this.Shape.Points[0]=pt;this.Shape.Points[last]=[pt[0],pt[1]];}
@@ -808,12 +821,17 @@ var PENCIL_WIDGET_NEW=0
 var PENCIL_WIDGET_WAITING=1
 var PENCIL_WIDGET_ACTIVE=2
 var PENCIL_WIDGET_DRAG=3;function PencilWidget(viewer,newFlag,showIcon,oneLineOnly){if(viewer==null){return;}
-if(typeof showIcon=="undefined")showIcon=true;if(typeof oneLineOnly=="undefined")oneLineOnly=false;this.Viewer=viewer;this.Viewer.WidgetList.push(this);this.IsTextActive=false;this.OutlineColor=[0.9,1.0,0.0];this.TextShape=false;this.LineWidth=0;this.OneLineOnly=oneLineOnly;this.DrawnCallback=function(widget){};this.ActivePoint=false;this.IsShapeUpdate=false;this.Cursor=$('<img>').appendTo('body').css({'position':'absolute','height':'28px','z-index':'1'}).attr('type','image').attr('src',"webgl-viewer/static/Pencil-icon.png");this.Shapes=[];if(!newFlag||!showIcon){this.Cursor.hide();}
+if(typeof showIcon=="undefined")showIcon=true;if(typeof oneLineOnly=="undefined")oneLineOnly=false;this.Viewer=viewer;this.Viewer.WidgetList.push(this);this.IsTextActive=false;this.OutlineColor=[0.9,1.0,0.0];this.TextShape=false;this.LineWidth=0;this.DynamicWidth=false;this.OneLineOnly=oneLineOnly;this.DrawnCallback=function(widget){};this.ActivePoint=false;this.IsShapeUpdate=false;this.Cursor=$('<img>').appendTo('body').css({'position':'absolute','height':'28px','z-index':'1'}).attr('type','image').attr('src',"webgl-viewer/static/Pencil-icon.png");this.Shapes=[];if(!newFlag||!showIcon){this.Cursor.hide();}
 if(newFlag)
 {this.Viewer.SetCursor("crosshair");this.State=PENCIL_WIDGET_NEW;}
 else
 {this.State=PENCIL_WIDGET_WAITING;}}
-PencilWidget.prototype.Draw=function(view){for(var i=0;i<this.Shapes.length;++i){this.Shapes[i].Draw(view);}
+PencilWidget.prototype.Draw=function(view){if(this.DynamicWidth)
+{var factor=(this.Viewer.MainView.Camera.Height/this.Viewer.MainView.Viewport[3]);for(var i=0;i<this.Shapes.length;++i){this.Shapes[i].LineWidth=factor;}}
+var bounds=this.GetSelectBounds();var topLeft=VIEWER1.ConvertPointWorldToViewer(bounds[0][0],bounds[0][1]);var bottomRight=VIEWER1.ConvertPointWorldToViewer(bounds[1][0],bounds[1][1]);if(this.State==PENCIL_WIDGET_NEW||(bottomRight[0]-topLeft[0])>20)
+{for(var i=0;i<this.Shapes.length;++i){this.Shapes[i].Draw(view);}}
+else
+{var centerX=(bounds[1][0]-bounds[0][0])/2+bounds[0][0];var centerY=(bounds[1][1]-bounds[0][1])/2+bounds[0][1];this.Viewer.DrawSquare(centerX,centerY,this.Shapes[0].OutlineColor);}
 if(this.TextShape!=false&&this.TextShape.String!="")
 {this.UpdatetTextPosition(view);this.TextShape.Draw(view);}
 else if(this.Viewer.AnnotationEditable)
@@ -822,7 +840,9 @@ this.TextShape.Color=[0.6,0.6,0.6];this.UpdatetTextPosition(view);this.TextShape
 PencilWidget.prototype.SetText=function(text,height){this.TextShape=new Text();this.TextShape.String=text;this.TextShape.Size=height;this.TextShape.Color=this.OutlineColor;this.TextShape.UpdateBuffers();}
 PencilWidget.prototype.UpdatetTextPosition=function(view){if(this.TextShape!=false&&this.TextShape.String!="")
 {var bounds=this.GetSelectBounds()
-this.TextShape.Position[0]=bounds[0][0]+(bounds[1][0]-bounds[0][0])/2;this.TextShape.Position[1]=bounds[1][1];var scale=this.Viewer.MainView.Viewport[3]/this.Viewer.MainView.Camera.GetHeight();view.Context2d.font=this.TextShape.Size+'pt Calibri';var width=view.Context2d.measureText(this.TextShape.String).width;this.TextShape.Anchor=[width/2,-5-scale*10];this.TextShape.UpdateBuffers();}}
+this.TextShape.Position[0]=bounds[0][0]+(bounds[1][0]-bounds[0][0])/2;this.TextShape.Position[1]=bounds[1][1];var scale=this.Viewer.MainView.Viewport[3]/this.Viewer.MainView.Camera.GetHeight();view.Context2d.font=this.TextShape.Size+'pt Calibri';var width=view.Context2d.measureText(this.TextShape.String).width;var stringTemp=this.TextShape.String;if(this.TextShape.String.indexOf("\n")!=-1)
+{stringTemp=stringTemp.substr(0,stringTemp.indexOf("\n"));}
+var width=view.Context2d.measureText(stringTemp).width;var lineNumber=(this.TextShape.String.split("\n").length-1);var offset=0;offset-=lineNumber*8;this.TextShape.Anchor=[width/2,offset-5-scale*10];this.TextShape.UpdateBuffers();}}
 PencilWidget.prototype.GetSelectBounds=function(){var x1=false;var x2=false;var y1=false;var y2=false;for(var j=0;j<this.Shapes.length;++j)
 {for(var i=0;i<this.Shapes[j].Points.length;++i)
 {var x=this.Shapes[j].Points[i][0];var y=this.Shapes[j].Points[i][1];if(x1==false||x<x1)
@@ -834,7 +854,7 @@ if(y1==false||y<y1)
 if(y2==false||y>y2)
 {y2=y;}}}
 return[[x1,y1],[x2,y2]];}
-PencilWidget.prototype.Serialize=function(){var obj=new Object();obj.type="pencil";obj.outlinecolor=this.OutlineColor;obj.shapes=[];obj.linewidth=this.LineWidth;for(var i=0;i<this.Shapes.length;++i){var shape=this.Shapes[i];var points=[];for(var j=0;j<shape.Points.length;++j){points.push([shape.Points[j][0],shape.Points[j][1]]);}
+PencilWidget.prototype.Serialize=function(){var obj=new Object();obj.type="pencil";obj.outlinecolor=this.OutlineColor;obj.shapes=[];obj.linewidth=this.LineWidth;obj.dynamicwidth=this.DynamicWidth;for(var i=0;i<this.Shapes.length;++i){var shape=this.Shapes[i];var points=[];for(var j=0;j<shape.Points.length;++j){points.push([shape.Points[j][0],shape.Points[j][1]]);}
 obj.shapes.push(points);}
 if(this.TextShape!=false&&this.TextShape.String!="")
 {obj.text=this.TextShape.String;}
@@ -843,7 +863,7 @@ PencilWidget.prototype.SetOutlineColor=function(c){this.OutlineColor=ConvertColo
 PencilWidget.prototype.ApplyColor=function(color){for(var i=0;i<this.Shapes.length;++i)
 {this.Shapes[i].OutlineColor=color;this.Shapes[i].Active=false;}}
 PencilWidget.prototype.Load=function(obj){this.OutlineColor=obj.outlinecolor
-for(var n=0;n<obj.shapes.length;n++){var points=obj.shapes[n];var shape=new Polyline();shape.OutlineColor=this.OutlineColor
+this.DynamicWidth=obj.dynamicwidth;for(var n=0;n<obj.shapes.length;n++){var points=obj.shapes[n];var shape=new Polyline();shape.OutlineColor=this.OutlineColor
 shape.FixedSize=false;shape.LineWidth=obj.linewidth;this.Shapes.push(shape);for(var m=0;m<points.length;++m){shape.Points[m]=[points[m][0],points[m][1]];}
 shape.Activate=false;shape.UpdateBuffers();}}
 PencilWidget.prototype.HandleKeyPress=function(keyCode,shift){}
@@ -987,8 +1007,8 @@ this.TitleDiv.text(this.Title);for(var i=0;i<this.Children.length;++i){var child
 if(this.Children.length>1&&this.UserCanEdit()&&NOTES_WIDGET.EditActive){var self=this;this.ChildrenDiv.sortable({axis:"y",containment:"parent",update:function(event,ui){self.ReorderChildren();}});}
 for(var i=0;i<this.ViewerRecords.length;++i){if(this.ViewerRecords[i]){obj=this.ViewerRecords[i];this.ViewerRecords[i]=new ViewerRecord();this.ViewerRecords[i].Load(obj);}}
 if(this==NOTES_WIDGET.RootNote){NOTES_WIDGET.DisplayRootNote();}}
-Note.prototype.LoadViewId=function(viewId){var self=this;$.ajax({type:"get",url:"/webgl-viewer/getview",data:{"sessid":localStorage.sessionId,"viewid":viewId,"db":GetSessionDatabase()},success:function(data,status){self.Load(data);},error:function(){alert("AJAX - error() : getview");},});}
-Note.prototype.RequestUserNotes=function(){var self=this;$.ajax({type:"get",url:"/webgl-viewer/getchildnotes",data:{"parentid":this.Id,"db":GetSessionDatabase()},success:function(data,status){self.LoadUserNotes(data);},error:function(){alert("AJAX - error() : getchildnotes");},});}
+Note.prototype.LoadViewId=function(viewId){var self=this;$.ajax({type:"get",url:"/webgl-viewer/getview",data:{"sessid":localStorage.sessionId,"viewid":viewId,"db":GetSessionDatabase()},success:function(data,status){self.Load(data);},error:function(){alert("AJAX - error() : getview");}});}
+Note.prototype.RequestUserNotes=function(){var self=this;$.ajax({type:"get",url:"/webgl-viewer/getchildnotes",data:{"parentid":this.Id,"db":GetSessionDatabase()},success:function(data,status){self.LoadUserNotes(data);},error:function(){alert("AJAX - error() : getchildnotes");}});}
 Note.prototype.LoadUserNotes=function(data){for(var i=0;i<data.Notes.length;++i){var noteData=data.Notes[i];var note=new Note();note.Load(noteData);this.Children.push(note);this.UpdateChildrenGUI();note.RequestUserNotes();}}
 Note.prototype.Collapse=function(){this.ChildrenVisibility=false;if(this.Contains(NOTES_WIDGET.SelectedNote)){this.Select();}
 this.UpdateChildrenGUI();NAVIGATION_WIDGET.Update();}
@@ -996,8 +1016,8 @@ Note.prototype.Expand=function(){this.ChildrenVisibility=true;this.UpdateChildre
 Note.prototype.DisplayView=function(){VIEWER1.Reset();VIEWER2.Reset();SetNumberOfViews(this.ViewerRecords.length);if(this.ViewerRecords.length>0){this.ViewerRecords[0].Apply(VIEWER1);}
 if(this.ViewerRecords.length>1){this.ViewerRecords[1].Apply(VIEWER2);}else{VIEWER2.SetCache(VIEWER1.GetCache());}}
 NotesWidget.prototype.SaveUserNote=function(){var childNote=new Note();var d=new Date();this.Date=d.getTime();childNote.Text=this.TextEntry.val();this.TextEntry.val("");childNote.ViewerRecords=[];var viewerRecord=new ViewerRecord();viewerRecord.CopyViewer(VIEWER1);childNote.ViewerRecords.push(viewerRecord);if(DUAL_VIEW){var viewerRecord=new ViewerRecord();viewerRecord.CopyViewer(VIEWER2);childNote.ViewerRecords.push(viewerRecord);}
-parentNote=this.Iterator.GetNote();parentNote.Children.push(childNote);childNote.ParentId=parentNote.Id;parentNote.ChildrenVisible=true;var bug=JSON.stringify(childNote);$.ajax({type:"post",url:"/webgl-viewer/saveusernote",data:{"note":JSON.stringify(childNote.Serialize(false)),"date":d.getTime()},success:function(data,status){childNote.Id=data;},error:function(){alert("AJAX - error() : saveusernote");},});NAVIGATION_WIDGET.NextNote();}
-NotesWidget.prototype.SaveBrownNote=function(){var note=new Note();note.RecordGUIChanges();parentNote=this.Iterator.GetNote();note.ParentId=parentNote.Id;$.ajax({type:"post",url:"/webgl-viewer/saveusernote",data:{"note":JSON.stringify(note.Serialize(false))},success:function(data,status){note.Id=data;},error:function(){alert("AJAX - error() : saveusernote");},});}
+parentNote=this.Iterator.GetNote();parentNote.Children.push(childNote);childNote.ParentId=parentNote.Id;parentNote.ChildrenVisible=true;var bug=JSON.stringify(childNote);$.ajax({type:"post",url:"/webgl-viewer/saveusernote",data:{"note":JSON.stringify(childNote.Serialize(false)),"date":d.getTime()},success:function(data,status){childNote.Id=data;},error:function(){alert("AJAX - error() : saveusernote");}});NAVIGATION_WIDGET.NextNote();}
+NotesWidget.prototype.SaveBrownNote=function(){var note=new Note();note.RecordGUIChanges();parentNote=this.Iterator.GetNote();note.ParentId=parentNote.Id;$.ajax({type:"post",url:"/webgl-viewer/saveusernote",data:{"note":JSON.stringify(note.Serialize(false))},success:function(data,status){note.Id=data;},error:function(){alert("AJAX - error() : saveusernote");}});}
 NotesWidget.prototype.NoteModified=function(){this.Modified=true;}
 NotesWidget.prototype.ToggleNotesWindow=function(){this.Visibilty=!this.Visibilty;RecordState();if(this.Visibilty){this.AnimationCurrent=this.WidthFraction;this.AnimationTarget=0.2;}else{this.Window.hide();this.AnimationCurrent=this.WidthFraction;this.AnimationTarget=0.0;}
 this.AnimationLastTime=new Date().getTime();this.AnimationDuration=1000.0;this.AnimateNotesWindow();}
@@ -1013,7 +1033,7 @@ this.EditActive=true;this.EditButton.hide();this.PopupMenuButton.show();this.New
 var iter=this.RootNote.NewIterator();do{var note=iter.GetNote();note.UpdateChildrenGUI();iter.Next();}while(!iter.IsEnd());window.onbeforeunload=function(){if(this.EditActive&&this.SelectedNote.UserCanEdit()){this.SelectedNote.RecordGUIChanges();}
 return"Some changes have not been saved to the database.";}}
 NotesWidget.prototype.SaveCallback=function(){this.PopupMenu.hide();if(this.EditActive&&this.SelectedNote.UserCanEdit()){this.SelectedNote.RecordGUIChanges();}
-var d=new Date();if(this.RootNote.UserCanEdit()){var noteObj=JSON.stringify(this.RootNote.Serialize(true));$.ajax({type:"post",url:"/webgl-viewer/saveviewnotes",data:{"note":noteObj,"db":GetSessionDatabase(),"view":GetViewId(),"date":d.getTime()},success:function(data,status){},error:function(){alert("AJAX - error() : saveviewnotes");},});}else{var iter=this.RootNote.GetIterator();do{var note=iter.GetNote();if(note.UserCanEdit()){$.ajax({type:"post",url:"/webgl-viewer/saveusernote",data:{"note":JSON.stringify(note.Serialize(false)),"db":GetSessionDatabase(),"date":d.getTime()},success:function(data,status){note.Id=data;},error:function(){alert("AJAX - error(): saveusernote");},});}}while(iter.IsEnd());}
+var d=new Date();if(this.RootNote.UserCanEdit()){var noteObj=JSON.stringify(this.RootNote.Serialize(true));$.ajax({type:"post",url:"/webgl-viewer/saveviewnotes",data:{"note":noteObj,"db":GetSessionDatabase(),"view":GetViewId(),"date":d.getTime()},success:function(data,status){},error:function(){alert("AJAX - error() : saveviewnotes");}});}else{var iter=this.RootNote.GetIterator();do{var note=iter.GetNote();if(note.UserCanEdit()){$.ajax({type:"post",url:"/webgl-viewer/saveusernote",data:{"note":JSON.stringify(note.Serialize(false)),"db":GetSessionDatabase(),"date":d.getTime()},success:function(data,status){note.Id=data;},error:function(){alert("AJAX - error(): saveusernote");}});}}while(iter.IsEnd());}
 window.onbeforeunload=null;this.Modified=false;this.EditActive=false;this.PopupMenuButton.hide();this.SaveButton.hide();this.CloneButton.hide();this.DeleteButton.hide();this.NewButton.hide();this.EditButton.show();this.SelectedNote.Select();}
 NotesWidget.prototype.DeleteCallback=function(){this.PopupMenu.hide();this.NoteModified();var parent=this.Iterator.GetParentNote();if(parent==null){return;}
 var note=this.Iterator.GetNote();NAVIGATION_WIDGET.PreviousNote();var index=parent.Children.indexOf(note);parent.Children.splice(index,1);parent.UpdateChildrenGUI();}
@@ -1026,21 +1046,30 @@ var k=timeStep/this.AnimationDuration;this.AnimationDuration*=(1.0-k);this.Width
 NotesWidget.prototype.DisplayRootNote=function(){this.NoteTreeDiv.empty();this.RootNote.DisplayGUI(this.NoteTreeDiv);this.RootNote.Select();}
 NotesWidget.prototype.LoadViewId=function(viewId){VIEW_ID=viewId;this.RootNote=new Note();if(typeof(viewId)!="undefined"&&viewId!=""){this.RootNote.LoadViewId(viewId);}}
 var RECTANGLE_WIDGET_NEW=0;var RECTANGLE_WIDGET_NEW_FACE=1;var RECTANGLE_WIDGET_WAITING=2;var RECTANGLE_WIDGET_DRAG=3;var RECTANGLE_WIDGET_ACTIVE=5;var RECTANGLE_WIDGET_MOVETOP=6;var RECTANGLE_WIDGET_MOVERIGHT=7;var RECTANGLE_WIDGET_MOVEBOTTOM=8;var RECTANGLE_WIDGET_MOVELEFT=9;function RectangleWidget(viewer,newFlag){if(viewer===undefined){return;}
-var cam=viewer.MainView.Camera;var viewport=viewer.MainView.Viewport;this.Viewer=viewer;this.IsTextActive=false;this.CenterDragPoint=false;this.MoveStatus=0;this.Shape=new Polyline();this.Shape.OutlineColor=[0.0,0.0,0.0];this.Shape.FixedSize=false;this.MiddleCrossOffset=100;this.IsShapeUpdate=false;this.Shape.Points[0]=[-50*cam.Height/viewport[3],-50*cam.Height/viewport[3]];this.Shape.Points[1]=[0,0];this.Shape.Points[2]=[50*cam.Height/viewport[3],50*cam.Height/viewport[3]];this.TextShape=false;this.DrawnCallback=function(widget){};this.Viewer.WidgetList.push(this);this.Shape.LineWidth=5.0*cam.Height/viewport[3];if(newFlag){this.State=RECTANGLE_WIDGET_NEW;this.Shape.Active=true;this.Viewer.ActivateWidget(this);}else{this.State=RECTANGLE_WIDGET_WAITING;}
+var cam=viewer.MainView.Camera;var viewport=viewer.MainView.Viewport;this.Viewer=viewer;this.IsTextActive=false;this.CenterDragPoint=false;this.MoveStatus=0;this.Shape=new Polyline();this.Shape.OutlineColor=[0.0,0.0,0.0];this.Shape.FixedSize=false;this.MiddleCrossOffset=100;this.IsShapeUpdate=false;this.Shape.Points[0]=[-50*cam.Height/viewport[3],-50*cam.Height/viewport[3]];this.Shape.Points[1]=[0,0];this.Shape.Points[2]=[50*cam.Height/viewport[3],50*cam.Height/viewport[3]];this.Shape.DynamicWidth=false;this.TextShape=false;this.DrawnCallback=function(widget){};this.Viewer.WidgetList.push(this);this.Shape.LineWidth=5.0*cam.Height/viewport[3];if(newFlag){this.State=RECTANGLE_WIDGET_NEW;this.Shape.Active=true;this.Viewer.ActivateWidget(this);}else{this.State=RECTANGLE_WIDGET_WAITING;}
 eventuallyRender();}
-RectangleWidget.prototype.Draw=function(view){this.Shape.Draw(view);if(this.Viewer.AnnotationEditable&&Math.abs(this.Shape.Points[0][0]-this.Shape.Points[1][0])>3*this.MiddleCrossOffset)
+RectangleWidget.prototype.Draw=function(view){var defaultWidth=this.Shape.LineWidth;if(this.Shape.DynamicWidth)
+{var factor=(this.Viewer.MainView.Camera.Height/this.Viewer.MainView.Viewport[3]);this.Shape.LineWidth=this.Shape.LineWidth*factor/defaultWidth;}
+var bounds=this.GetSelectBounds();var topLeft=VIEWER1.ConvertPointWorldToViewer(bounds[0][0],bounds[0][1]);var bottomRight=VIEWER1.ConvertPointWorldToViewer(bounds[1][0],bounds[1][1]);if(this.State==RECTANGLE_WIDGET_NEW||this.State==RECTANGLE_WIDGET_NEW_FACE||(bottomRight[0]-topLeft[0])>20)
+{this.Shape.Draw(view);}
+else
+{var centerX=(bounds[1][0]-bounds[0][0])/2+bounds[0][0];var centerY=(bounds[1][1]-bounds[0][1])/2+bounds[0][1];this.Viewer.DrawSquare(centerX,centerY,this.Shape.OutlineColor);}
+if(this.Viewer.AnnotationEditable&&Math.abs(this.Shape.Points[0][0]-this.Shape.Points[1][0])>3*this.MiddleCrossOffset)
 {var vertical=new Polyline();var center=[0,0];center[0]=this.Shape.Points[0][0]-(this.Shape.Points[0][0]-this.Shape.Points[1][0])/2;center[1]=this.Shape.Points[0][1]-(this.Shape.Points[0][1]-this.Shape.Points[2][1])/2;vertical.OutlineColor=[0.6,0.6,0.6];vertical.FixedSize=false;vertical.Points=[];vertical.Points.push([center[0]-this.MiddleCrossOffset,center[1]]);vertical.Points.push([center[0]+this.MiddleCrossOffset,center[1]]);vertical.UpdateBuffers();vertical.Draw(view)
 var horizontal=new Polyline();horizontal.OutlineColor=[0.6,0.6,0.6];horizontal.FixedSize=false;horizontal.Points=[];horizontal.Points.push([center[0],center[1]-this.MiddleCrossOffset]);horizontal.Points.push([center[0],center[1]+this.MiddleCrossOffset]);horizontal.UpdateBuffers();horizontal.Draw(view)}
 if(this.TextShape!=false&&this.TextShape.String!="")
 {this.UpdatetTextPosition(view);this.TextShape.Draw(view);}
 else if(this.Viewer.AnnotationEditable)
 {this.SetText("Add Label",12)
-this.TextShape.Color=[0.6,0.6,0.6];this.UpdatetTextPosition(view);this.TextShape.Draw(view);this.TextShape=false;}}
+this.TextShape.Color=[0.6,0.6,0.6];this.UpdatetTextPosition(view);this.TextShape.Draw(view);this.TextShape=false;}
+this.Shape.LineWidth=defaultWidth;}
 RectangleWidget.prototype.GetSelectBounds=function(){var offset=this.Shape.LineWidth;var pt1=[this.Shape.Points[0][0]-offset,this.Shape.Points[0][1]-offset];var pt2=[this.Shape.Points[2][0]+offset,this.Shape.Points[2][1]+offset];return[pt1,pt2];}
 RectangleWidget.prototype.SetDrawnCallback=function(callback){this.DrawnCallback=callback;}
 RectangleWidget.prototype.SetText=function(text,height){this.TextShape=new Text();this.TextShape.String=text;this.TextShape.Size=height;this.TextShape.Color=this.Shape.OutlineColor;this.TextShape.UpdateBuffers();}
 RectangleWidget.prototype.UpdatetTextPosition=function(view){if(this.TextShape!=false&&this.TextShape.String!="")
-{this.TextShape.Position[0]=this.Shape.Points[0][0]+(this.Shape.Points[2][0]-this.Shape.Points[0][0])/2;this.TextShape.Position[1]=this.Shape.Points[2][1];var scale=this.Viewer.MainView.Viewport[3]/this.Viewer.MainView.Camera.GetHeight();view.Context2d.font=this.TextShape.Size+'pt Calibri';var width=view.Context2d.measureText(this.TextShape.String).width;this.TextShape.Anchor=[width/2,-5-(scale*this.Shape.LineWidth)/2];this.TextShape.UpdateBuffers();}}
+{this.TextShape.Position[0]=this.Shape.Points[0][0]+(this.Shape.Points[2][0]-this.Shape.Points[0][0])/2;this.TextShape.Position[1]=this.Shape.Points[2][1];var scale=this.Viewer.MainView.Viewport[3]/this.Viewer.MainView.Camera.GetHeight();view.Context2d.font=this.TextShape.Size+'pt Calibri';var stringTemp=this.TextShape.String;if(this.TextShape.String.indexOf("\n")!=-1)
+{stringTemp=stringTemp.substr(0,stringTemp.indexOf("\n"));}
+var lineNumber=(this.TextShape.String.split("\n").length-1);var width=view.Context2d.measureText(stringTemp).width;var offset=0;offset-=lineNumber*8;this.TextShape.Anchor=[width/2,offset-5-(scale*this.Shape.LineWidth)/2];this.TextShape.UpdateBuffers();}}
 RectangleWidget.prototype.CheckActive=function(event){var x=event.MouseX;var y=event.MouseY;var pt=this.Viewer.ConvertPointViewerToWorld(x,y);this.IsTextActive=false;var textOriginScreenPixelPosition;var tMouseX=null;var tMouseY=null;if(this.TextShape!=false&&this.TextShape.String!="")
 {textOriginScreenPixelPosition=this.Viewer.ConvertPointWorldToViewer(this.TextShape.Position[0],this.TextShape.Position[1]);tMouseX=(x-textOriginScreenPixelPosition[0])+this.TextShape.Anchor[0];tMouseY=(y-textOriginScreenPixelPosition[1])+this.TextShape.Anchor[1];if(tMouseX!=null&&tMouseX>this.TextShape.PixelBounds[0]&&tMouseX<this.TextShape.PixelBounds[1]&&tMouseY>this.TextShape.PixelBounds[2]&&tMouseY<this.TextShape.PixelBounds[3])
 {this.SetActive(true);this.IsTextActive=true;this.Viewer.SetCursor("text");return true;}}
@@ -1064,11 +1093,11 @@ this.Viewer.SetCursor("ns-resize");}
 return true;}}
 this.SetActive(false);return false;}
 RectangleWidget.prototype.Serialize=function(){if(this.Shape===undefined){return null;}
-var obj=new Object();obj.type="rectangle";obj.outlinecolor=this.Shape.OutlineColor;obj.linewidth=this.Shape.LineWidth;obj.test="";if(this.TextShape!=false&&this.TextShape.String!="")
+var obj=new Object();obj.type="rectangle";obj.outlinecolor=this.Shape.OutlineColor;obj.linewidth=this.Shape.LineWidth;obj.test="";obj.dynamicwidth=this.Shape.DynamicWidth;if(this.TextShape!=false&&this.TextShape.String!="")
 {obj.text=this.TextShape.String;}
 obj.points=[];for(var i=0;i<this.Shape.Points.length;++i){obj.points.push([this.Shape.Points[i][0],this.Shape.Points[i][1]]);}
 obj.closedloop=this.ClosedLoop;return obj;}
-RectangleWidget.prototype.Load=function(obj){this.Shape.OutlineColor[0]=parseFloat(obj.outlinecolor[0]);this.Shape.OutlineColor[1]=parseFloat(obj.outlinecolor[1]);this.Shape.OutlineColor[2]=parseFloat(obj.outlinecolor[2]);this.Shape.LineWidth=parseFloat(obj.linewidth);this.CreatePointArray(obj.points[0],obj.points[2]);this.ClosedLoop=(obj.closedloop=="true");}
+RectangleWidget.prototype.Load=function(obj){this.Shape.OutlineColor[0]=parseFloat(obj.outlinecolor[0]);this.Shape.OutlineColor[1]=parseFloat(obj.outlinecolor[1]);this.Shape.OutlineColor[2]=parseFloat(obj.outlinecolor[2]);this.Shape.LineWidth=parseFloat(obj.linewidth);this.CreatePointArray(obj.points[0],obj.points[2]);this.Shape.DynamicWidth=obj.dynamicwidth;this.ClosedLoop=(obj.closedloop=="true");}
 RectangleWidget.prototype.CreatePointArray=function(topLeft,bottomRight){var newTopLeft=[0,0];var newBottomRight=[0,0];if(topLeft[0]<bottomRight[0])
 {newTopLeft[0]=topLeft[0];newBottomRight[0]=bottomRight[0];}
 else
@@ -1107,7 +1136,7 @@ RectangleWidget.prototype.GetActive=function(){if(this.State==RECTANGLE_WIDGET_W
 return true;}
 RectangleWidget.prototype.SetActive=function(flag){if(flag==this.GetActive()){return;}
 if(flag){this.State=RECTANGLE_WIDGET_ACTIVE;this.Shape.Active=true;if(this.TextShape!=false)this.TextShape.Active=true;this.Viewer.ActivateWidget(this);eventuallyRender();}else{this.Deactivate();}}
-function Shape(){this.Orientation=0.0;this.Origin=[10000,10000];this.FixedSize=true;this.FixedOrientation=true;this.LineWidth=0;this.Visibility=true;this.Active=false;this.ActiveColor=[1.0,1.0,0.0];this.ZOffset=0.1;};Shape.prototype.destructor=function(){}
+function Shape(){this.Orientation=0.0;this.Origin=[10000,10000];this.FixedSize=true;this.FixedOrientation=true;this.LineWidth=0;this.Visibility=true;this.Active=false;this.ActiveColor=[0.70,0.9,0.33];this.ZOffset=0.1;};Shape.prototype.destructor=function(){}
 Shape.prototype.Draw=function(view){if(!this.Visibility){return;}
 if(this.Matrix==undefined){this.UpdateBuffers();}
 if(GL){var camMatrix=mat4.create();mat4.identity(camMatrix);if(this.FixedSize){var viewFrontZ=view.Camera.ZRange[0]+0.01;camMatrix[0]=2.0/view.Viewport[2];camMatrix[12]=-1.0;camMatrix[5]=2.0/view.Viewport[3];camMatrix[13]=-1.0;camMatrix[14]=viewFrontZ;}
@@ -1136,8 +1165,7 @@ function Arrow(){Shape.call(this);this.Width=10;this.Length=50;this.Orientation=
 Arrow.prototype.PointInShape=function(x,y){var tmp=this.Orientation*Math.PI/180.0;var ct=Math.cos(tmp);var st=Math.sin(tmp);xNew=x*ct+y*st;yNew=-x*st+y*ct;tmp=this.Width/2.0;if(xNew>0.0&&xNew<this.Length&&yNew<tmp&&yNew>-tmp){return true;}}
 Arrow.prototype.UpdateBuffers=function(){this.PointBuffer=[];var cellData=[];var hw=this.Width*0.5;var w2=this.Width*2.0;this.Matrix=mat4.create();mat4.identity(this.Matrix);this.PointBuffer.push(0.0);this.PointBuffer.push(0.0);this.PointBuffer.push(0.0);this.PointBuffer.push(w2);this.PointBuffer.push(this.Width);this.PointBuffer.push(0.0);this.PointBuffer.push(w2);this.PointBuffer.push(hw);this.PointBuffer.push(0.0);this.PointBuffer.push(this.Length);this.PointBuffer.push(hw);this.PointBuffer.push(0.0);this.PointBuffer.push(this.Length);this.PointBuffer.push(-hw);this.PointBuffer.push(0.0);this.PointBuffer.push(w2);this.PointBuffer.push(-hw);this.PointBuffer.push(0.0);this.PointBuffer.push(w2);this.PointBuffer.push(-this.Width);this.PointBuffer.push(0.0);this.PointBuffer.push(0.0);this.PointBuffer.push(0.0);this.PointBuffer.push(0.0);if(GL){cellData.push(0);cellData.push(1);cellData.push(2);cellData.push(0);cellData.push(2);cellData.push(5);cellData.push(0);cellData.push(5);cellData.push(6);cellData.push(2);cellData.push(3);cellData.push(4);cellData.push(2);cellData.push(4);cellData.push(5);this.VertexPositionBuffer=GL.createBuffer();GL.bindBuffer(GL.ARRAY_BUFFER,this.VertexPositionBuffer);GL.bufferData(GL.ARRAY_BUFFER,new Float32Array(this.PointBuffer),GL.STATIC_DRAW);this.VertexPositionBuffer.itemSize=3;this.VertexPositionBuffer.numItems=this.PointBuffer.length/3;this.CellBuffer=GL.createBuffer();GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER,this.CellBuffer);GL.bufferData(GL.ELEMENT_ARRAY_BUFFER,new Uint16Array(cellData),GL.STATIC_DRAW);this.CellBuffer.itemSize=1;this.CellBuffer.numItems=cellData.length;}}
 function Circle(){Shape.call(this);this.Radius=10;this.Origin=[10000,10000];this.OutlineColor=[0,0,0];this.PointBuffer=[];};Circle.prototype=new Shape;Circle.prototype.destructor=function(){}
-Circle.prototype.UpdateBuffers=function(){this.PointBuffer=[];var cellData=[];var lineCellData=[];var numEdges=Math.floor(this.Radius/2)+10;if(numEdges>50||!this.FixedSize){numEdges=50;}
-this.Matrix=mat4.create();mat4.identity(this.Matrix);if(GL){if(this.LineWidth==0){for(var i=0;i<=numEdges;++i){var theta=i*2*3.14159265359/numEdges;this.PointBuffer.push(this.Radius*Math.cos(theta));this.PointBuffer.push(this.Radius*Math.sin(theta));this.PointBuffer.push(0.0);}
+Circle.prototype.UpdateBuffers=function(){this.PointBuffer=[];var cellData=[];var lineCellData=[];var numEdges=360;this.Matrix=mat4.create();mat4.identity(this.Matrix);if(GL){if(this.LineWidth==0){for(var i=0;i<=numEdges;++i){var theta=i*2*3.14159265359/numEdges;this.PointBuffer.push(this.Radius*Math.cos(theta));this.PointBuffer.push(this.Radius*Math.sin(theta));this.PointBuffer.push(0.0);}
 for(var i=2;i<numEdges;++i){cellData.push(0);cellData.push(i-1);cellData.push(i);}
 this.VertexPositionBuffer=GL.createBuffer();GL.bindBuffer(GL.ARRAY_BUFFER,this.VertexPositionBuffer);GL.bufferData(GL.ARRAY_BUFFER,new Float32Array(this.PointBuffer),GL.STATIC_DRAW);this.VertexPositionBuffer.itemSize=3;this.VertexPositionBuffer.numItems=this.PointBuffer.length/3;this.CellBuffer=GL.createBuffer();GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER,this.CellBuffer);GL.bufferData(GL.ELEMENT_ARRAY_BUFFER,new Uint16Array(cellData),GL.STATIC_DRAW);this.CellBuffer.itemSize=1;this.CellBuffer.numItems=cellData.length;}else{var minRad=this.Radius;var maxRad=this.Radius+this.LineWidth;for(var i=0;i<=numEdges;++i){var theta=i*2*3.14159265359/numEdges;this.PointBuffer.push(minRad*Math.cos(theta));this.PointBuffer.push(minRad*Math.sin(theta));this.PointBuffer.push(0.0);this.PointBuffer.push(maxRad*Math.cos(theta));this.PointBuffer.push(maxRad*Math.sin(theta));this.PointBuffer.push(0.0);}
 this.VertexPositionBuffer=GL.createBuffer();GL.bindBuffer(GL.ARRAY_BUFFER,this.VertexPositionBuffer);GL.bufferData(GL.ARRAY_BUFFER,new Float32Array(this.PointBuffer),GL.STATIC_DRAW);this.VertexPositionBuffer.itemSize=3;this.VertexPositionBuffer.numItems=this.PointBuffer.length/3;for(var i=2;i<numEdges;++i){cellData.push(0);cellData.push((i-1)*2);cellData.push(i*2);}
@@ -1160,9 +1188,10 @@ eventuallyRender();}
 Text.prototype.Draw=function(view){var m=view.Camera.Matrix;var x=(this.Position[0]*m[0]+this.Position[1]*m[4]+m[12])/m[15];var y=(this.Position[0]*m[1]+this.Position[1]*m[5]+m[13])/m[15];x=view.Viewport[2]*(0.5*(1.0+x));if(GL){y=view.Viewport[3]*(0.5*(1.0+y));if(this.TextureLoaded==false){return;}
 if(this.Matrix==undefined){this.UpdateBuffers();this.Matrix=mat4.create();mat4.identity(this.Matrix);}
 var program=textProgram;GL.useProgram(program);GL.blendFunc(GL.SRC_ALPHA,GL.ONE_MINUS_SRC_ALPHA);GL.enable(GL.BLEND);GL.bindBuffer(GL.ARRAY_BUFFER,this.VertexPositionBuffer);GL.vertexAttribPointer(program.vertexPositionAttribute,this.VertexPositionBuffer.itemSize,GL.FLOAT,false,0,0);GL.bindBuffer(GL.ARRAY_BUFFER,this.VertexTextureCoordBuffer);GL.vertexAttribPointer(program.textureCoordAttribute,this.VertexTextureCoordBuffer.itemSize,GL.FLOAT,false,0,0);GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER,this.CellBuffer);if(this.Active){GL.uniform3f(program.colorUniform,1.0,1.0,0.0);}else{GL.uniform3f(program.colorUniform,this.Color[0],this.Color[1],this.Color[2]);}
-GL.viewport(view.Viewport[0],view.Viewport[1],view.Viewport[2],view.Viewport[3]);var viewFrontZ=view.Camera.ZRange[0]+0.01;var camMatrix=mat4.create();mat4.identity(camMatrix);camMatrix[0]=2.0/view.Viewport[2];camMatrix[12]=-1.0;camMatrix[5]=2.0/view.Viewport[3];camMatrix[13]=-1.0;camMatrix[14]=viewFrontZ;GL.uniformMatrix4fv(program.pMatrixUniform,false,camMatrix);this.Matrix[12]=x-this.Anchor[0];this.Matrix[13]=y-this.Anchor[1];GL.uniformMatrix4fv(program.mvMatrixUniform,false,this.Matrix);GL.activeTexture(GL.TEXTURE0);GL.bindTexture(GL.TEXTURE_2D,this.Texture);GL.uniform1i(program.samplerUniform,0);GL.drawElements(GL.TRIANGLES,this.CellBuffer.numItems,GL.UNSIGNED_SHORT,0);}else{var strArray=this.String.split("\n");var width=0;var height=this.Size*strArray.length;y=view.Viewport[3]*(0.5*(1.0-y));x=x-this.Anchor[0];y=y+this.Anchor[1];var ctx=view.Context2d;ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.font=this.Size+'pt Calibri';ctx.shadowColor="white";ctx.shadowBlur=2;if(this.Active){ctx.fillStyle=ConvertColorToHex([1.0,1.0,0.0]);}else{ctx.fillStyle=ConvertColorToHex(this.Color);}
+GL.viewport(view.Viewport[0],view.Viewport[1],view.Viewport[2],view.Viewport[3]);var viewFrontZ=view.Camera.ZRange[0]+0.01;var camMatrix=mat4.create();mat4.identity(camMatrix);camMatrix[0]=2.0/view.Viewport[2];camMatrix[12]=-1.0;camMatrix[5]=2.0/view.Viewport[3];camMatrix[13]=-1.0;camMatrix[14]=viewFrontZ;GL.uniformMatrix4fv(program.pMatrixUniform,false,camMatrix);this.Matrix[12]=x-this.Anchor[0];this.Matrix[13]=y-this.Anchor[1];GL.uniformMatrix4fv(program.mvMatrixUniform,false,this.Matrix);GL.activeTexture(GL.TEXTURE0);GL.bindTexture(GL.TEXTURE_2D,this.Texture);GL.uniform1i(program.samplerUniform,0);GL.drawElements(GL.TRIANGLES,this.CellBuffer.numItems,GL.UNSIGNED_SHORT,0);}else{var strArray=this.String.split("\n");var width=0;var height=this.Size*strArray.length;y=view.Viewport[3]*(0.5*(1.0-y));x=x-this.Anchor[0];y=y+this.Anchor[1];var ctx=view.Context2d;ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.font=this.Size+'pt Calibri';ctx.textAlign='center';if(this.Active){ctx.fillStyle=ConvertColorToHex([0.70,0.9,0.33]);}else{ctx.fillStyle=ConvertColorToHex(this.Color);}
+var maxWidth=0;for(var i=0;i<strArray.length;++i){var lineWidth=ctx.measureText(strArray[i]).width;if(lineWidth>maxWidth){maxWidth=lineWidth;}}
 for(var i=0;i<strArray.length;++i){var lineWidth=ctx.measureText(strArray[i]).width;if(lineWidth>width){width=lineWidth;}
-ctx.fillText(strArray[i],x,y+this.Size*i);}
+ctx.fillText(strArray[i],x+maxWidth/2,y+this.Size*i);}
 this.PixelBounds=[0,width,-height+this.Size,this.Size];ctx.restore();}}
 Text.prototype.UpdateBuffers=function(){if(!GL){return;}
 var vertexPositionData=[];var textureCoordData=[];var cellData=[];var top=98.0/128.0;var charLeft=0;var charBottom=0;var ptId=0;this.PixelBounds=[0,0,0,this.Size];for(var i=0;i<this.String.length;++i){var idx=this.String.charCodeAt(i);if(idx==10||idx==13){charLeft=0;charBottom-=this.Size;}else{var port=ASCII_LOOKUP[idx];var tLeft=port[0]/1024.0;var tRight=(port[0]+port[2])/1024.0;var tBottom=port[1]/512.0;var tTop=(port[1]+port[3])/512.0;var charRight=charLeft+port[2]*this.Size/98.0;var charTop=charBottom+port[3]*this.Size/98.0;if(this.PixelBounds[0]>charLeft){this.PixelBounds[0]=charLeft;}
@@ -1245,15 +1274,15 @@ function setActiveWidget(type,lineWidth)
 {var color="green";if(typeof VIEWER1.ActiveColor!="undefined")
 {color=VIEWER1.ActiveColor;}
 if(type=="circle")
-{var widget=new CircleWidget(VIEWER1,true);widget.EnableWidgetPopup(false);widget.Shape.LineWidth=lineWidth;VIEWER1.ActiveWidget=widget;VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);}
+{var widget=new CircleWidget(VIEWER1,true);widget.EnableWidgetPopup(false);widget.Shape.LineWidth=lineWidth;widget.Shape.DynamicWidth=true;VIEWER1.ActiveWidget=widget;VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);}
 else if(type=="rectangle")
-{var widget=new RectangleWidget(VIEWER1,true);widget.Shape.LineWidth=lineWidth;VIEWER1.ActiveWidget=widget;VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);}
+{var widget=new RectangleWidget(VIEWER1,true);widget.Shape.LineWidth=lineWidth;widget.Shape.DynamicWidth=true;VIEWER1.ActiveWidget=widget;VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);}
 else if(type=="arrow")
 {var widget=new ArrowWidget(VIEWER1,true);VIEWER1.ActiveWidget=widget;VIEWER1.ActiveWidget.Shape.SetFillColor(color);}
 else if(type=="pencil")
-{var widget=new PencilWidget(VIEWER1,true,false,true);widget.LineWidth=lineWidth;VIEWER1.ActiveWidget=widget;VIEWER1.ActiveWidget.SetOutlineColor(color);}
+{var widget=new PencilWidget(VIEWER1,true,false,true);widget.LineWidth=lineWidth;widget.DynamicWidth=true;VIEWER1.ActiveWidget=widget;VIEWER1.ActiveWidget.SetOutlineColor(color);}
 else if(type=="ruler")
-{var widget=new PolylineWidget(VIEWER1,true,true);widget.Shape.LineWidth=lineWidth;VIEWER1.ActiveWidget=widget;VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);}
+{var widget=new PolylineWidget(VIEWER1,true,true);widget.Shape.LineWidth=lineWidth;widget.Shape.DynamicWidth=true;VIEWER1.ActiveWidget=widget;VIEWER1.ActiveWidget.Shape.SetOutlineColor(color);}
 else if(VIEWER1.ActiveWidget!=null)
 {VIEWER1.ActiveWidget.SetActive(false);}}
 function setDrawnCallback(callback)
@@ -1291,14 +1320,14 @@ $.each(obj.features,function(i,feature)
 {var widget=VIEWER1.WidgetList[VIEWER1.WidgetList.length-1];if(typeof widget.SetText!="undefined")
 {widget.SetText(feature.properties.text,12);}}})}
 geoJson.Io.createObj={"point":function(array){},"circle":function(feature){var obj={}
-obj.type="circle";obj.origin=feature.geometry.coordinates[0];obj.radius=feature.geometry.coordinates[1];obj.outlinecolor=feature.properties.outlinecolor;obj.linewidth=feature.properties.linewidth;VIEWER1.LoadWidget(obj);},"rectangle":function(feature){var obj={}
-obj.type="rectangle";obj.points=feature.geometry.coordinates;obj.outlinecolor=feature.properties.outlinecolor;obj.linewidth=feature.properties.linewidth;VIEWER1.LoadWidget(obj);},"pencil":function(feature){var obj={}
-obj.type="pencil";obj.shapes=feature.geometry.coordinates;obj.outlinecolor=feature.properties.outlinecolor;obj.linewidth=feature.properties.linewidth;VIEWER1.LoadWidget(obj);},"arrow":function(feature){var obj={}
+obj.type="circle";obj.origin=feature.geometry.coordinates[0];obj.radius=feature.geometry.coordinates[1];obj.outlinecolor=feature.properties.outlinecolor;obj.linewidth=feature.properties.linewidth;obj.dynamicwidth=feature.properties.dynamicwidth;VIEWER1.LoadWidget(obj);},"rectangle":function(feature){var obj={}
+obj.type="rectangle";obj.points=feature.geometry.coordinates;obj.outlinecolor=feature.properties.outlinecolor;obj.linewidth=feature.properties.linewidth;obj.dynamicwidth=feature.properties.dynamicwidth;VIEWER1.LoadWidget(obj);},"pencil":function(feature){var obj={}
+obj.type="pencil";obj.shapes=feature.geometry.coordinates;obj.outlinecolor=feature.properties.outlinecolor;obj.linewidth=feature.properties.linewidth;obj.dynamicwidth=feature.properties.dynamicwidth;VIEWER1.LoadWidget(obj);},"arrow":function(feature){var obj={}
 obj.type="arrow";obj.origin=feature.geometry.coordinates.origin;obj.fillcolor=feature.geometry.coordinates.fillcolor;obj.length=feature.geometry.coordinates.length;obj.width=feature.geometry.coordinates.width;obj.orientation=feature.geometry.coordinates.orientation;obj.fixedsize=""+feature.geometry.coordinates.fixedsize;obj.fixedorientation=""+feature.geometry.coordinates.fixedorientation;obj.outlinecolor=feature.properties.outlinecolor;obj.linewidth=feature.properties.linewidth;VIEWER1.LoadWidget(obj);},"polyline":function(feature){var obj={}
-obj.type="polyline";obj.points=feature.geometry.coordinates.points;obj.spacing=feature.geometry.coordinates.spacing;obj.closedloop=feature.geometry.coordinates.closedloop;obj.outlinecolor=feature.properties.outlinecolor;obj.linewidth=feature.properties.linewidth;VIEWER1.LoadWidget(obj);}},geoJson.Io.write=function(obj){var geojson={"type":null};geojson.type="FeatureCollection";var numFeatures=obj.Annotations.length;geojson.features=new Array(numFeatures);for(var i=0;i<numFeatures;++i){var element=obj.Annotations[i];geojson.features[i]=this.extract.feature.apply(this,[element]);if(typeof element.text!="undefined"&&element.text!="")
+obj.type="polyline";obj.points=feature.geometry.coordinates.points;obj.spacing=feature.geometry.coordinates.spacing;obj.closedloop=feature.geometry.coordinates.closedloop;obj.outlinecolor=feature.properties.outlinecolor;obj.linewidth=feature.properties.linewidth;obj.dynamicwidth=feature.properties.dynamicwidth;VIEWER1.LoadWidget(obj);}},geoJson.Io.write=function(obj){var geojson={"type":null};geojson.type="FeatureCollection";var numFeatures=obj.Annotations.length;geojson.features=new Array(numFeatures);for(var i=0;i<numFeatures;++i){var element=obj.Annotations[i];geojson.features[i]=this.extract.feature.apply(this,[element]);if(typeof element.text!="undefined"&&element.text!="")
 {geojson.features[i].properties['text']=element.text;}}
 return JSON.stringify(geojson);}
-geoJson.Io.extract={'feature':function(feature){var geom=this.extract.geometry.apply(this,[feature]);var json={"type":"Feature","properties":{linewidth:feature.linewidth,outlinecolor:feature.outlinecolor},"geometry":geom};if(feature.fid!=null){json.id=feature.fid;}
+geoJson.Io.extract={'feature':function(feature){var geom=this.extract.geometry.apply(this,[feature]);var json={"type":"Feature","properties":{linewidth:feature.linewidth,outlinecolor:feature.outlinecolor,dynamicwidth:feature.dynamicwidth},"geometry":geom};if(feature.fid!=null){json.id=feature.fid;}
 return json;},'geometry':function(geometry){if(geometry==null){return null;}
 var geometryType=geometry.type;var data=this.extract[geometryType.toLowerCase()].apply(this,[geometry]);var json;if(geometryType=="Collection"){json={"type":"GeometryCollection","geometries":data};}else{json={"type":geometryType,"coordinates":data};}
 return json;},'point':function(point){return[point.x,point.y];},'circle':function(circle){return[circle.origin,circle.radius];},'rectangle':function(rectangle){return rectangle.points;},'pencil':function(rectangle){return rectangle.shapes;},'arrow':function(arrow){return{origin:arrow.origin,fillcolor:arrow.fillcolor,length:arrow.length,width:arrow.width,orientation:arrow.orientation,fixedsize:arrow.fixedsize,fixedorientation:arrow.fixedorientation};},'polyline':function(multipoint){var array={points:multipoint.points,closedloop:multipoint.closedloop,spacing:multipoint.spacing}

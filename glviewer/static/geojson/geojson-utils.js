@@ -78,6 +78,7 @@ geoJson.Io.createObj = {
     obj.radius = feature.geometry.coordinates[1];
     obj.outlinecolor = feature.properties.outlinecolor;
     obj.linewidth = feature.properties.linewidth;
+    obj.dynamicwidth = feature.properties.dynamicwidth;
     VIEWER1.LoadWidget(obj);
   },
   
@@ -87,6 +88,7 @@ geoJson.Io.createObj = {
     obj.points = feature.geometry.coordinates;
     obj.outlinecolor = feature.properties.outlinecolor;
     obj.linewidth = feature.properties.linewidth;
+    obj.dynamicwidth = feature.properties.dynamicwidth;
     VIEWER1.LoadWidget(obj);
   },
   
@@ -96,6 +98,7 @@ geoJson.Io.createObj = {
     obj.shapes = feature.geometry.coordinates;
     obj.outlinecolor = feature.properties.outlinecolor;
     obj.linewidth = feature.properties.linewidth;
+    obj.dynamicwidth = feature.properties.dynamicwidth;
     VIEWER1.LoadWidget(obj);
   },
   
@@ -122,6 +125,7 @@ geoJson.Io.createObj = {
     obj.closedloop = feature.geometry.coordinates.closedloop;
     obj.outlinecolor = feature.properties.outlinecolor;
     obj.linewidth = feature.properties.linewidth;
+    obj.dynamicwidth = feature.properties.dynamicwidth;
     VIEWER1.LoadWidget(obj);
   }
   
@@ -184,7 +188,7 @@ geoJson.Io.extract ={
     var geom = this.extract.geometry.apply(this, [feature]);
     var json = {
       "type": "Feature",
-      "properties": {linewidth:feature.linewidth , outlinecolor:feature.outlinecolor},
+      "properties": {linewidth:feature.linewidth , outlinecolor:feature.outlinecolor, dynamicwidth:feature.dynamicwidth},
       "geometry": geom
     };
     if (feature.fid != null) {
